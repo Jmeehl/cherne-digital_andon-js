@@ -1,0 +1,1224 @@
+/* =========================================================
+   Floor Alerts - Clean styles.css
+   - Consolidated to remove duplicates/overrides
+   - Includes maintenance ticket mockup styling + status popup
+   - Includes maintenance-grid (6 across) option
+   ========================================================= */
+
+/* -------------------------
+   CSS Variables
+-------------------------- */
+:root{
+  --bg: #ffffff;
+  --text: #111111;
+  --muted: #6f6f6f;
+
+  --tile-border: #d8d8d8;
+  --ready-opacity: 0.45;
+  --waiting-bg: #e53935;
+  --waiting-text: #ffffff;
+
+  --btn-bg: #ffffff;
+  --btn-text: #111111;
+
+  --accent: #1565c0;
+
+  /* extra tokens used by some components */
+  --panel: #ffffff;
+  --border: #d8d8d8;
+  --shadow: 0 10px 26px rgba(0,0,0,0.12);
+
+  --danger: #c62828;
+  --warn: #ef6c00;
+  --ok: #2e7d32;
+}
+
+*{
+  box-sizing: border-box;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+body{
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* -------------------------
+   Top Navigation
+-------------------------- */
+.topnav{
+  position: sticky;
+  top: 0;
+  z-index: 2000;
+  background: #fbfbfb;
+  border-bottom: 1px solid #e6e6e6;
+  padding: 10px 16px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: nowrap;
+}
+
+.topnav .left,
+.topnav .right{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.topnav .right{
+  justify-content: flex-end;
+  flex: 1 1 auto;
+}
+
+.topnav a{
+  text-decoration: none;
+  background: #f6f6f6;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: #111;
+  font-weight: 650;
+}
+
+.topnav a:hover{ background: #efefef; }
+
+.topnav select{
+  padding: 8px 10px;
+  font-size: 16px;
+  width: auto;
+  max-width: 220px;
+}
+
+.nav-title{
+  font-weight: 900;
+  font-size: 18px;
+  margin-right: 6px;
+}
+
+.nav-logo{
+  height: 50px;
+  width: auto;
+  display: block;
+}
+
+.badge{
+  display: inline-block;
+  background: color-mix(in srgb, var(--accent) 18%, white);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, white);
+  color: #0f2a48;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+
+/* Small screens: allow wrap gracefully */
+@media (max-width: 1100px){
+  .topnav{ flex-wrap: wrap; }
+  .topnav .right{
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+}
+
+/* -------------------------
+   Theme Toggle UI
+-------------------------- */
+.theme-toggle{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 6px;
+  user-select: none;
+}
+
+.theme-toggle .label{
+  font-weight: 900;
+  font-size: 14px;
+  color: var(--text);
+  opacity: 0.9;
+}
+
+.switch{
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: #d7dbe0;
+  border: 1px solid #c9cfd6;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.switch::after{
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  transition: transform 0.15s ease;
+}
+
+.switch[data-on="true"]{
+  background: color-mix(in srgb, var(--accent) 55%, #2a3139);
+  border-color: color-mix(in srgb, var(--accent) 60%, #2a3139);
+}
+
+.switch[data-on="true"]::after{
+  transform: translateX(20px);
+}
+
+/* -------------------------
+   Buttons
+-------------------------- */
+.btn{
+  margin-top: 14px;
+  align-self: center;
+  border: none;
+  border-radius: 10px;
+  padding: 14px 22px;
+  font-size: 20px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.btn.complete{
+  background: var(--btn-bg);
+  color: var(--btn-text);
+}
+
+.btn.secondary{
+  background: #f0f0f0;
+  color: #222;
+}
+
+button.small{
+  padding: 8px 10px;
+  border-radius: 10px;
+}
+
+/* Normalize nav button height to match links */
+.topnav .left a,
+.topnav .left button,
+.topnav .right button{
+  padding: 8px 10px !important;
+  border-radius: 10px !important;
+  font-size: 14px !important;
+  line-height: 1.1 !important;
+  margin: 0 !important;
+}
+
+/* -------------------------
+   Dashboard Header
+-------------------------- */
+.header{
+  padding: 22px 36px 8px 36px;
+}
+
+.title-row{
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 20px;
+}
+
+h1{
+  margin: 0;
+  font-size: 48px;
+  letter-spacing: 1px;
+}
+
+.clock{
+  font-size: 38px;
+  color: #222;
+}
+
+.subhead{
+  margin-top: 8px;
+  font-size: 24px;
+  color: #222;
+}
+
+.subhead .alert{
+  font-weight: 800;
+  color: #c62828;
+}
+
+/* -------------------------
+   Grid / Tiles (Non-maint)
+-------------------------- */
+.grid{
+  padding: 18px 36px 36px 36px;
+  display: grid;
+  gap: 18px;
+}
+
+/* Wallboard default: 5 columns */
+.grid.wallboard{
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+}
+
+/* Responsive fallback */
+@media (max-width: 1200px){
+  .grid.wallboard{ grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 900px){
+  .grid.wallboard{ grid-template-columns: repeat(3, 1fr); }
+}
+
+.tile{
+  border: 3px solid var(--tile-border);
+  border-radius: 14px;
+  padding: 20px;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.tile .name{
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  line-height: 1.05;
+}
+
+.tile .status{
+  margin-top: 10px;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.tile .timer{
+  margin-top: 6px;
+  font-size: 32px;
+  font-weight: 900;
+  color: #555;
+}
+
+.tile.ready{
+  background: #fff;
+  opacity: var(--ready-opacity);
+}
+
+.tile.waiting{
+  background: var(--waiting-bg);
+  border-color: #b71c1c;
+  opacity: 1;
+}
+
+.tile.waiting .status,
+.tile.waiting .timer,
+.tile.waiting .name{
+  color: var(--waiting-text);
+}
+
+.tile.waiting .timer{
+  font-size: 38px;
+}
+
+/* -------------------------
+   Modal Base
+-------------------------- */
+.modal-backdrop{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+}
+
+.modal-backdrop.show{ display: flex; }
+
+.modal{
+  width: 680px;
+  max-width: 92vw;
+  background: #fff;
+  border-radius: 14px;
+  border: 2px solid #ddd;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  padding: 22px;
+}
+
+.modal h2{
+  margin: 0 0 8px 0;
+  font-size: 28px;
+}
+
+.modal .cell-tag{
+  color: #666;
+  margin-bottom: 14px;
+}
+
+.modal label{
+  display: block;
+  margin: 10px 0 6px 0;
+  font-weight: 800;
+}
+
+.modal textarea{
+  width: 100%;
+  min-height: 110px;
+  font-size: 16px;
+  padding: 10px;
+}
+
+.modal input,
+.modal select{
+  width: 100%;
+  font-size: 18px;
+  padding: 10px;
+}
+
+.modal .row{
+  margin-top: 16px;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.hold-submit{
+  position: relative;
+  overflow: hidden;
+}
+
+.hold-progress{
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0%;
+  background: rgba(21, 101, 192, 0.20);
+  transition: width 0.05s linear;
+  pointer-events: none;
+}
+
+/* -------------------------
+   Maintenance Request Modal (tablet)
+-------------------------- */
+.maint-modal textarea{ min-height: 140px; }
+.maint-modal select{ width: 100%; }
+
+.maint-error{
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #f2b8b8;
+  background: #fff5f5;
+  color: #b71c1c;
+  font-weight: 900;
+}
+
+/* -------------------------
+   Cell Page
+-------------------------- */
+.tablet-wrap{
+  height: calc(100vh - 60px);
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 12px;
+}
+
+.tablet-title{
+  font-size: 34px;
+  font-weight: 950;
+  line-height: 1.1;
+}
+
+.tablet-status{
+  border: 3px solid var(--tile-border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.dept-row{
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.dept-row label{ font-weight: 900; }
+
+.dept-row select{
+  padding: 10px 12px;
+  font-size: 18px;
+  min-width: 280px;
+}
+
+.active-calls-box{
+  border: 2px solid #e6e6e6;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #fbfbfb;
+}
+
+.active-calls-box .title{
+  font-weight: 900;
+  margin-bottom: 6px;
+}
+
+.active-calls{
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.big-btn{
+  flex: 1 1 auto;
+  min-height: 36vh;
+  border: none;
+  border-radius: 22px;
+  cursor: pointer;
+  font-size: 54px;
+  font-weight: 950;
+  line-height: 1.1;
+  white-space: normal;
+  text-align: center;
+  padding: 22px 18px;
+}
+
+.big-btn.request{ background: #1b5e20; color: #fff; }
+.big-btn.cancel{ background: #c62828; color: #fff; }
+
+.hold-hint{
+  font-size: 18px;
+  text-align: center;
+  color: #444;
+}
+
+/* Tablet "Open Calls" compact row layout */
+.open-call-line{
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--accent) 5%, var(--panel));
+  margin-top: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+
+.open-call-line + .open-call-line{
+  margin-top: 3px;
+  border-top: 2px solid var(--border);
+  padding-top: 5px;
+}
+
+.ocl-left{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.ocl-status{
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 34%;
+  font-weight: 900;
+  color: #444;
+}
+
+.ocl-dept,
+.ocl-wait,
+.ocl-sep{ white-space: nowrap; }
+
+.ocl-machine,
+.ocl-note{
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ocl-machine{ max-width: 28%; }
+.ocl-note{ max-width: 52%; }
+
+/* Small cancel button (force inline sizing) */
+.ocl-cancel{
+  flex: 0 0 auto;
+  align-self: center;
+  display: inline-flex !important;
+  width: auto !important;
+  max-width: none !important;
+  padding: 4px 8px !important;
+  border-radius: 10px !important;
+  font-size: 12px !important;
+  line-height: 1 !important;
+  font-weight: 950 !important;
+  margin: 0 !important;
+}
+
+/* -------------------------
+   History Page
+-------------------------- */
+.history-wrap{
+  padding: 22px 36px;
+}
+
+.history-header{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.history-title{
+  font-size: 34px;
+  font-weight: 950;
+  margin: 0;
+}
+
+.controls{
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.controls input,
+.controls select,
+.controls button,
+.controls a{
+  padding: 8px 10px;
+  font-size: 16px;
+}
+
+.controls a{
+  text-decoration: none;
+  background: #f6f6f6;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  color: #111;
+  font-weight: 700;
+}
+
+.controls a:hover{ background: #efefef; }
+
+.controls input[type="month"]{ min-width: 160px; }
+#export8hrBtn{ border-style: dashed; }
+
+.table-wrap{
+  overflow: auto;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  max-height: calc(100vh - 170px);
+}
+
+table{
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+thead th{
+  position: sticky;
+  top: 0;
+  background: #f7f7f7;
+  border-bottom: 1px solid #ddd;
+  text-align: left;
+  padding: 10px;
+  font-size: 13px;
+}
+
+tbody td{
+  border-bottom: 1px solid #eee;
+  padding: 10px;
+  font-size: 13px;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+tbody td.note{ white-space: normal; }
+
+/* Maintenance history: wrap issue/solution */
+#histTable td.col-issue,
+#histTable td.col-solution{
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+  vertical-align: top;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+#histTable td.col-issue{ max-width: 640px; }
+#histTable td.col-solution{ max-width: 520px; }
+
+/* -------------------------
+   Metrics on History Page
+-------------------------- */
+.metrics{
+  margin: 10px 0 18px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.kpis{
+  display: grid;
+  grid-template-columns: repeat(5, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.kpi-card{
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px 12px;
+}
+
+.kpi-label{
+  font-size: 12px;
+  font-weight: 900;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.kpi-value{
+  margin-top: 6px;
+  font-size: 22px;
+  font-weight: 950;
+}
+
+.kpi-sub{
+  margin-top: 2px;
+  font-size: 12px;
+  color: #666;
+  font-weight: 700;
+}
+
+.charts{
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 1400px){
+  .charts{ grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 1100px){
+  .kpis{ grid-template-columns: repeat(2, 1fr); }
+  .charts{ grid-template-columns: 1fr; }
+}
+
+.chart-card{
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px;
+}
+
+.chart-title{
+  font-weight: 950;
+  margin-bottom: 8px;
+}
+
+.chart-subtitle{
+  margin-top: 6px;
+  font-size: 12px;
+  color: #666;
+  font-weight: 700;
+}
+
+/* -------------------------
+   Responders Modal
+-------------------------- */
+.responder-modal-row{
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 10px 0 12px 0;
+}
+
+.responder-modal-row input{
+  flex: 1 1 360px;
+  padding: 10px 12px;
+  font-size: 16px;
+}
+
+.responder-modal-list{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow: auto;
+  padding-right: 6px;
+}
+
+.responder-item{
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #eee;
+  background: #fafafa;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 800;
+}
+
+.responder-item button{
+  background: #c62828;
+  color: white;
+  border: 1px solid #b71c1c;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.responder-item button:hover{ background: #b71c1c; }
+
+/* =========================================================
+   MAINTENANCE DASHBOARD - Ticket mockup style
+   ========================================================= */
+
+/* Maintenance grid: fit one more across (6 columns) */
+.grid.wallboard.maintenance-grid{
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+}
+
+/* Outer wrapper is neutral; inner is the orange card */
+.ticket{
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  min-height: auto !important;
+}
+
+.mnt-ticket{
+  background: #f9a304;
+  border: 2px solid rgba(0,0,0,0.35);
+  border-radius: 18px;
+  padding: 18px 18px 16px 18px;
+  box-shadow: 0 14px 36px rgba(0,0,0,0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 360px;
+}
+
+.mnt-title{
+  text-align: center;
+  font-weight: 950;
+  font-size: 40px;
+  letter-spacing: 0.5px;
+  line-height: 1.05;
+}
+
+.mnt-timer{
+  text-align: center;
+  font-weight: 950;
+  font-size: 46px;
+  line-height: 1;
+  margin-top: -6px;
+}
+
+.mnt-rows{
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mnt-row{
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.mnt-row-top{ align-items: start; }
+
+.mnt-key{
+  font-weight: 900;
+  font-size: 18px;
+  opacity: 0.9;
+}
+
+.mnt-val{
+  font-weight: 900;
+  font-size: 28px;
+  line-height: 1.15;
+}
+
+.mnt-pri.high,
+.mnt-pri.medium,
+.mnt-pri.low{
+  color: #111;
+  letter-spacing: 0.4px;
+}
+
+/* WO pill */
+.mnt-wo{
+  border: 2px solid rgba(0,0,0,0.35);
+  background: #fff;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 950;
+  font-size: 26px;
+  cursor: pointer;
+  width: fit-content;
+  min-width: 150px;
+  text-align: center;
+}
+
+.mnt-wo:hover{ background: #f8f8f8; }
+
+/* Issue text */
+.mnt-issue{
+  font-weight: 800;
+  font-size: 18px;
+  line-height: 1.25;
+  max-height: 92px;
+  overflow: hidden;
+}
+
+/* Status row: button that opens popup */
+.mnt-status-btn{
+  width: 100%;
+  text-align: left;
+  border: 2px solid rgba(0,0,0,0.22);
+  background: rgba(255,255,255,0.65);
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.mnt-status-btn:hover{
+  background: rgba(255,255,255,0.75);
+}
+
+.mnt-status-text{
+  display: block;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+/* Complete button */
+.mnt-complete{
+  margin-top: auto;
+  align-self: center;
+  background: #2fb34a;
+  color: #1a1a1a;
+  border: 2px solid rgba(0,0,0,0.25);
+  border-radius: 14px;
+  padding: 14px 34px;
+  font-size: 28px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.mnt-complete:hover{ filter: brightness(0.98); }
+
+/* Slightly tighter at 6 across */
+.grid.wallboard.maintenance-grid .mnt-ticket{
+  padding: 16px 16px 14px 16px;
+  min-height: 340px;
+}
+.grid.wallboard.maintenance-grid .mnt-title{ font-size: 36px; }
+.grid.wallboard.maintenance-grid .mnt-timer{ font-size: 42px; }
+.grid.wallboard.maintenance-grid .mnt-row{ grid-template-columns: 96px 1fr; }
+.grid.wallboard.maintenance-grid .mnt-key{ font-size: 16px; }
+.grid.wallboard.maintenance-grid .mnt-val{ font-size: 24px; }
+.grid.wallboard.maintenance-grid .mnt-wo{
+  font-size: 22px;
+  padding: 8px 12px;
+  min-width: 130px;
+}
+.grid.wallboard.maintenance-grid .mnt-issue{
+  font-size: 16px;
+  max-height: 80px;
+}
+.grid.wallboard.maintenance-grid .mnt-complete{
+  font-size: 24px;
+  padding: 12px 28px;
+}
+
+/* Status modal sizing */
+.status-modal{
+  width: 720px;
+  max-width: 92vw;
+}
+
+.status-modal textarea{ min-height: 120px; }
+
+/* =========================================================
+   DARK THEME
+   ========================================================= */
+.theme-dark{
+  --bg: #0f1216;
+  --text: #e6e8ea;
+  --muted: #a0a8b2;
+
+  --tile-border: #25303b;
+
+  --waiting-bg: #c62828;
+  --waiting-text: #ffffff;
+
+  --btn-bg: #1c232b;
+  --btn-text: #e6e8ea;
+
+  --panel: #12171d;
+  --border: #2a3139;
+  --shadow: 0 10px 26px rgba(0,0,0,0.45);
+}
+
+.theme-dark body{
+  background: var(--bg);
+  color: var(--text);
+}
+
+.theme-dark .topnav{
+  background-image: linear-gradient(to right bottom, rgb(56, 56, 56), rgb(16, 16, 16));;
+  border-bottom-color: #2a3139;
+}
+
+.theme-dark .topnav a {
+  background: #1a2027;
+  border-color: var(--border);
+  color: var(--text);
+}
+.theme-dark .topnav a:hover { background: #232b35; }
+
+
+.theme-dark .topnav a:hover{ background: #232b35; }
+
+.theme-dark .nav-title,
+.theme-dark .theme-toggle .label{ color: var(--text); }
+
+.theme-dark .clock{ color: #d9dee3; }
+.theme-dark .subhead{ color: var(--text); }
+.theme-dark .subhead .alert{ color: #ff9a7d; }
+
+.theme-dark .tile{
+  background: #12171d;
+  border-color: var(--tile-border);
+}
+
+.theme-dark .tile .name{ color: var(--text); }
+.theme-dark .tile .status{ color: var(--muted); }
+.theme-dark .tile .timer{ color: #b5bdc6; }
+
+.theme-dark .tile.ready{
+  background: #0f1419;
+  opacity: 0.65;
+}
+
+.theme-dark .tile.waiting{
+  background: var(--waiting-bg);
+  border-color: #ef5350;
+  opacity: 1;
+}
+
+.theme-dark .tile.waiting .name,
+.theme-dark .tile.waiting .status,
+.theme-dark .tile.waiting .timer{
+  color: var(--waiting-text);
+}
+
+.theme-dark .btn{
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  border: 1px solid #2a3139;
+}
+
+.theme-dark .btn.secondary{
+  background: #1a2027;
+  color: var(--text);
+  border: 1px solid #2a3139;
+}
+
+.theme-dark .btn:hover{ background: #232b35; }
+
+.theme-dark .modal-backdrop{ background: rgba(0,0,0,0.55); }
+
+.theme-dark .modal{
+  background: #12171d;
+  border-color: #2a3139;
+  color: var(--text);
+}
+
+.theme-dark .modal textarea,
+.theme-dark .modal input,
+.theme-dark .modal select{
+  background: #0f1419;
+  color: var(--text);
+  border: 1px solid #2a3139;
+}
+
+.theme-dark .hold-progress{ background: rgba(21, 101, 192, 0.28); }
+
+.theme-dark .table-wrap{ border-color: #2a3139; }
+.theme-dark table{ background: #11161b; color: var(--text); }
+.theme-dark thead th{
+  background: #151a21;
+  border-bottom-color: #2a3139;
+  color: var(--text);
+}
+.theme-dark tbody td{ border-bottom-color: #202832; }
+
+.theme-dark .controls input,
+.theme-dark .controls select{
+  background: #0f1419;
+  color: var(--text);
+  border: 1px solid #2a3139;
+}
+
+.theme-dark .kpi-card,
+.theme-dark .chart-card{
+  background: #12171d;
+  border-color: #2a3139;
+}
+
+.theme-dark .kpi-label,
+.theme-dark .kpi-sub,
+.theme-dark .chart-subtitle{
+  color: #a0a8b2;
+}
+
+.theme-dark .responder-item{
+  background: #0f1419;
+  border-color: #202832;
+}
+
+.theme-dark .responder-modal-row input{
+  background: #0f1419;
+  color: var(--text);
+  border: 1px solid #2a3139;
+}
+
+.theme-dark .maint-error{
+  background: rgba(198, 40, 40, 0.15);
+  border-color: rgba(239, 83, 80, 0.5);
+  color: #ffb4b4;
+}
+
+/* dark mode for tablet open-call list shadow */
+.theme-dark .open-call-line{
+  box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+}
+
+/* maintenance ticket: keep readable if dark theme ever applied */
+.theme-dark .mnt-ticket{
+  background: #fb9802;
+  color: #111;
+}
+
+/* Keep chart canvases from affecting layout */
+.charts canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+/* --- Stabilize chart layout and prevent canvas growth --- */
+.chart-card { 
+  min-width: 0; 
+  overflow: hidden; 
+}
+
+.charts canvas {
+  display: block;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto; /* ok for width-only cases, but we will override via inline style */
+}
+
+/* Tablet language selector aligns with existing selects */
+#langSelect {
+  padding: 10px 12px;
+  font-size: 18px;
+  min-width: 280px;
+}
+
+/* Tablet nav language selector */
+#navLangSelect {
+  padding: 8px 10px;
+  font-size: 14px;
+  border-radius: 10px;
+}
+
+/* =========================================================
+   OVEN PAGE: Dark theme overrides for inline styles
+   ========================================================= */
+.theme-dark .oven-wrap .muted {
+  color: var(--muted);
+}
+
+.theme-dark .oven-wrap .card {
+  background: var(--panel);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.theme-dark .oven-wrap canvas {
+  background: #0f1419;
+  border-color: var(--border);
+}
+
+/* =========================================================
+   DARK THEME: Scrollbar styling (WebKit + Firefox)
+   Applies to table scroll areas like Mold Cleaning list (.table-wrap)
+   ========================================================= */
+
+/* Firefox */
+.theme-dark .table-wrap {
+  scrollbar-width: thin;
+  scrollbar-color: #2a3139 #0f1419; /* thumb, track */
+}
+
+/* Chrome/Edge/Safari */
+.theme-dark .table-wrap::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.theme-dark .table-wrap::-webkit-scrollbar-track {
+  background: #0f1419;
+  border-radius: 12px;
+}
+
+.theme-dark .table-wrap::-webkit-scrollbar-thumb {
+  background: #2a3139;
+  border-radius: 12px;
+  border: 3px solid #0f1419; /* creates padding and darker edge */
+}
+
+.theme-dark .table-wrap::-webkit-scrollbar-thumb:hover {
+  background: #3a4450;
+}

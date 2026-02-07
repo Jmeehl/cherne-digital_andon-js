@@ -1,0 +1,84 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CHERNE Assist</title>
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon-180x180.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="/assets/apple-touch-icon-167x167.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="/assets/apple-touch-icon-152x152.png">
+  <!-- fallback -->
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <link rel="icon" type="image/svg+xml" href="/assets/logo.png" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+
+<body>
+  <div id="topnav"></div>
+
+  <div class="tablet-wrap">
+    <div class="tablet-title" id="cellName">CELL</div>
+
+    <div class="dept-row">
+      <label for="deptSelect" id="notifyLabel">Notify:</label>
+      <select id="deptSelect"></select>
+    </div>
+
+    <div class="tablet-status" id="cellStatus">Status: ...</div>
+
+    <div class="active-calls-box">
+      <div class="title" id="activeCallsTitle">Active calls at this cell:</div>
+      <div class="active-calls" id="activeCalls"></div>
+    </div>
+
+    <button class="big-btn request" id="requestBtn">REQUEST</button>
+    <button class="big-btn cancel" id="cancelBtn" style="display:none;">HOLD 2s TO CANCEL</button>
+    <div class="hold-hint" id="holdHint" style="display:none;">Keep holding to cancel…</div>
+  </div>
+
+  <!-- Maintenance Request Modal -->
+  <div id="maintModal" class="modal-backdrop">
+    <div class="modal maint-modal" role="dialog" aria-modal="true">
+      <h2 id="maintTitle" style="margin-top:0;">Submit Maintenance Request</h2>
+
+      <div class="cell-tag" id="maintCellTag">Cell: —</div>
+
+      <label id="maintAssetLabel" for="maintAsset">Asset</label>
+      <select id="maintAsset"></select>
+
+      <div id="maintHelp" class="chart-subtitle" style="margin-top:6px;">
+        Choose an asset in your cell, or select “General Maintenance (No Asset)”.
+      </div>
+
+      <label id="maintPriorityLabel" for="maintPriority">Priority</label>
+      <select id="maintPriority">
+        <option value="Low">Low</option>
+        <option value="Medium" selected>Medium</option>
+        <option value="High">High</option>
+      </select>
+
+      <label id="maintDescLabel" for="maintDesc">Description (required)</label>
+      <textarea id="maintDesc" placeholder="Describe the issue (what’s happening, symptoms, etc.)"></textarea>
+
+      <div class="row" style="margin-top:12px;">
+        <button id="maintCancel" class="btn secondary">Cancel</button>
+        <button id="maintSubmit" class="btn">Submit</button>
+      </div>
+
+      <div id="maintError" class="maint-error" style="display:none;"></div>
+    </div>
+  </div>
+
+  <script src="/i18n.js"></script>
+  <script src="/nav.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/cell.js"></script>
+  <script src="/pwa.js"></script>
+</body>
+</html>

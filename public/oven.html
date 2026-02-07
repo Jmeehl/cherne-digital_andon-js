@@ -1,0 +1,65 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Oven Shift Performance</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .oven-wrap { max-width: 1200px; margin: 20px auto; padding: 0 12px; }
+    .oven-controls { display:flex; flex-wrap:wrap; gap:12px; align-items:end; }
+    .oven-controls label { font-weight:800; display:block; margin-bottom:6px; }
+    .oven-controls input { padding:10px; font-size:16px; }
+    .btn { padding:10px 14px; font-weight:900; cursor:pointer; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; }
+    .card { background:#fff; border:1px solid #ddd; border-radius:10px; padding:12px 14px; min-width:220px; }
+    .card h3 { margin:0 0 6px 0; }
+    .muted { color:#666; }
+    canvas { background:#fff; border:1px solid #ddd; border-radius:10px; width:100%; height:420px; }
+    .legend { display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; }
+    .legend .item { display:flex; align-items:center; gap:8px; font-weight:800; }
+    .swatch { width:14px; height:14px; border-radius:3px; display:inline-block; }
+    .error { color:#b00020; font-weight:900; margin-top:10px; }
+  </style>
+</head>
+<body>
+  <div id="topnav"></div>
+
+  <div class="oven-wrap">
+    <h1 style="margin-top:8px;">Oven Shift Performance</h1>
+    <div class="muted">Completed molds per hour where Plug Present = true (by MoldSize).</div>
+
+    <div class="oven-controls" style="margin-top:14px;">
+      <div>
+        <label for="start">Start</label>
+        <input id="start" type="datetime-local" />
+      </div>
+
+      <div>
+        <label for="end">End</label>
+        <input id="end" type="datetime-local" />
+      </div>
+
+      <button class="btn" id="applyBtn">Apply</button>
+      <button class="btn" id="todayBtn">Today</button>
+      <button class="btn" id="shiftBtn">This Shift</button>
+      <button class="btn" id="last8Btn">Last 8 Hours</button>
+      <label style="display:flex; gap:8px; align-items:center; margin-left:8px;">
+        <input id="live" type="checkbox" />
+        Live (refresh 60s)
+      </label>
+    </div>
+
+    <div class="row" style="margin-top:14px;" id="shiftCards"></div>
+
+    <div style="margin-top:14px;">
+      <canvas id="chart" width="1200" height="420"></canvas>
+      <div class="legend" id="legend"></div>
+      <div class="error" id="error" style="display:none;"></div>
+    </div>
+  </div>
+
+  <script src="/nav.js"></script>
+  <script src="/oven.js"></script>
+</body>
+</html>

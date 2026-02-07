@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mold Cleaning - CHERNE Assist</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    /* Layout: main table + right side panel */
+    .molds-layout {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 12px;
+      align-items: start;
+    }
+    @media (max-width: 1200px) {
+      .molds-layout { grid-template-columns: 1fr; }
+    }
+
+    .side-stack { display: flex; flex-direction: column; gap: 12px; }
+
+    .small-table-wrap { max-height: 340px; }
+
+    .pill {
+      display:inline-block; padding:6px 10px; border-radius:999px;
+      border:1px solid #ddd; background:#f6f6f6; font-weight:900;
+    }
+    .theme-dark .pill { background:#151a21; border-color:#2a3139; }
+
+    .status-dot {
+      width:10px; height:10px; border-radius:999px; display:inline-block; margin-right:8px;
+      background:#999;
+    }
+    .dot-ok { background: #2e7d32; }
+    .dot-warn { background: #ef6c00; }
+    .dot-off { background: #6f6f6f; }
+  </style>
+</head>
+<body>
+  <div id="topnav"></div>
+
+  <div class="history-wrap">
+    <div class="history-header">
+      <div>
+        <div class="history-title" id="moldsTitle">Mold Cleaning</div>
+        <div class="chart-subtitle" id="moldsSubtitle">
+          Live mold cleaning worklist (updates every minute)
+        </div>
+      </div>
+
+      <div class="controls">
+        <label for="threshold" style="font-weight:900;">Clean @</label>
+        <input id="threshold" type="number" min="1" step="1" style="width:110px;" />
+        <span style="font-weight:900;">cycles</span>
+        <button id="saveThreshold" class="btn secondary" type="button">Save</button>
+
+        <label for="sizeFilter" style="font-weight:900;">Size</label>
+        <select id="sizeFilter">
+          <option value="">All</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+        </select>
+
+        <label for="statusFilter" style="font-weight:900;">Status</label>
+        <select id="statusFilter">
+          <option value="">All</option>
+          <option value="OVERDUE">Overdue</option>
+          <option value="DUE_SOON">Due soon</option>
+          <option value="OK">OK</option>
+        </select>
+
+        <label style="font-weight:900; display:flex; align-items:center; gap:8px;">
+          <input id="activeOnly" type="checkbox" />
+          Active only
+        </label>
+
+        <input id="searchMold" type="text" placeholder="Search mold #…" />
+        <button id="refresh" class="btn secondary" type="button">Refresh</button>
+      </div>
+    </div>
+
+    <div class="molds-layout">
+      <!-- MAIN -->
+      <div class="metrics">
+        <div class="kpis" id="kpis"></div>
+
+        <div class="table-wrap" style="max-height: calc(100vh - 240px);">
+          <table>
+            <thead>
+              <tr>
+                <th>Mold</th>
+                <th>Size</th>
+                <th>Cycles Since Cleaning</th>
+                <th>Over By</th>
+                <th>Total Cycles (TTD)</th>
+                <th>Last Record</th>
+                <th>Age (min)</th>
+                <th>Status</th>
+                <th>Active</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SIDE PANEL -->
+      <div class="side-stack">
+        <div class="chart-card">
+          <div class="chart-title">System (Active) Status</div>
+          <div class="chart-subtitle" id="activeMeta">
+            Active = mold has a record within the last 180 minutes.
+          </div>
+
+          <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+            <span class="pill" id="systemState">
+              <span class="status-dot dot-off" id="systemDot"></span>
+              Status: —
+            </span>
+            <span class="pill" id="activeTotal">Active: —</span>
+            <span class="pill" id="sinceLatest">Latest Record: —</span>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-title">Active by Size</div>
+          <div class="table-wrap small-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Size</th>
+                  <th>Qty</th>
+                </tr>
+              </thead>
+              <tbody id="activeCounts"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-title">Active Molds</div>
+          <div class="table-wrap small-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Mold</th>
+                  <th>Age</th>
+                </tr>
+              </thead>
+              <tbody id="activeMolds"></tbody>
+            </table>
+          </div>
+          <div class="chart-subtitle">Mold format: size-number (ex: 2-47)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/nav.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/molds.js"></script>
+</body>
+</html>

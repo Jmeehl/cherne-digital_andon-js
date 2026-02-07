@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>History</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon-180x180.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="/assets/apple-touch-icon-167x167.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="/assets/apple-touch-icon-152x152.png">
+
+  <!-- fallback -->
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body>
+  <div id="topnav"></div>
+
+  <div class="history-wrap">
+    <div class="history-header">
+      <div>
+        <div class="history-title" id="histTitle">History</div>
+        <div class="chart-subtitle" id="histSubtitle">Completed calls (most recent first)</div>
+      </div>
+
+      <div class="controls">
+        <label for="range">Show</label>
+        <select id="range">
+          <option value="250">250</option>
+          <option value="500" selected>500</option>
+          <option value="1000">1000</option>
+          <option value="2000">2000</option>
+          <option value="5000">5000</option>
+          <option value="10000">10000</option>
+        </select>
+
+        <!-- NEW: Date range (all depts) -->
+        <label for="startDate">Start</label>
+        <input id="startDate" type="date" />
+        <label for="endDate">End</label>
+        <input id="endDate" type="date" />
+
+        <!-- NEW: Quick presets -->
+        <select id="presetRange" title="Quick ranges">
+          <option value="">Preset…</option>
+          <option value="7d">Last 7 days</option>
+          <option value="30d">Last 30 days</option>
+          <option value="90d">Last 90 days</option>
+          <option value="ytd">Year to date</option>
+          <option value="1y">Last 365 days</option>
+        </select>
+
+        <!-- NEW: Machine dropdown (maintenance only) -->
+        <label for="assetSelect" id="assetLabel" style="display:none;">Machine</label>
+        <select id="assetSelect" style="display:none;">
+          <option value="">All machines</option>
+        </select>
+
+        <input id="search" type="text" placeholder="Search…" />
+        <button id="refresh" class="btn secondary" type="button">Refresh</button>
+        <a id="exportCsv" class="btn secondary" href="#" download>Export CSV</a>
+
+        <!-- Keep for your manager report; shown only for maintenance -->
+        <button id="export8hrBtn" class="btn secondary" type="button" style="display:none;">
+          Export 8+ hr (range)
+        </button>
+
+        <button id="deleteHistoryBtn" class="btn secondary" type="button">Delete History</button>
+      </div>
+    </div>
+
+    <div class="metrics">
+      <div class="kpis" id="kpis"></div>
+
+      <div class="charts">
+        <div class="chart-card">
+          <div class="chart-title">Trend (Time Open)</div>
+          <canvas id="trendChart" height="180"></canvas>
+          <div class="chart-subtitle" id="trendSubtitle"></div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-title">Calls by responder</div>
+          <canvas id="responderChart" height="220"></canvas>
+          <div class="chart-subtitle" id="responderSubtitle"></div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-title" id="driverTitle">Top drivers</div>
+          <canvas id="cellChart" height="220"></canvas>
+          <div class="chart-subtitle" id="cellSubtitle"></div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table id="histTable">
+          <thead>
+            <tr>
+              <th>Completed</th>
+              <th>Department</th>
+              <th>Cell</th>
+
+              <!-- NEW: Machine column (maintenance only) -->
+              <th class="col-asset" style="display:none;">Machine</th>
+
+              <th>Responder</th>
+              <th class="col-part">Part #</th>
+
+              <th class="col-fiix" style="display:none;">Fiix WO</th>
+              <th class="col-issue" style="display:none;">Issue</th>
+              <th class="col-solution" style="display:none;">Solution</th>
+
+              <th>Result</th>
+              <th>Time Open</th>
+              <th class="col-note">Note</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete history modal -->
+  <div id="deleteModal" class="modal-backdrop">
+    <div class="modal">
+      <h2>Delete History</h2>
+      <p style="font-weight:900;">This will permanently delete completed call history for this department.</p>
+      <div class="row">
+        <button id="cancelDelete" class="btn secondary" type="button">Cancel</button>
+        <button id="confirmDelete" class="btn" type="button">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Responders modal (opened by nav event) -->
+  <div id="respondersModal" class="modal-backdrop">
+    <div class="modal">
+      <h2>Responders</h2>
+      <div class="responder-modal-row">
+        <input id="newResponder" type="text" placeholder="Add responder name…" />
+        <button id="addResponderBtn" class="btn" type="button">Add</button>
+        <button id="closeRespondersBtn" class="btn secondary" type="button">Close</button>
+      </div>
+      <div id="responderList" class="responder-modal-list"></div>
+    </div>
+  </div>
+
+  <script src="/nav.js"></script>
+  <script src="/history.js"></script>
+  <script src="/pwa.js"></script>
+</body>
+</html>

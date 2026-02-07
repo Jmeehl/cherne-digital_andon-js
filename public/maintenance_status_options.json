@@ -1,0 +1,13 @@
+{
+  "options": [
+    "Waiting for parts",
+    "In progress",
+    "Waiting for operator",
+    "Waiting for production window",
+    "Waiting for vendor",
+    "Troubleshooting",
+    "Testing / verification",
+    "Scheduled",
+    "Needs approval"
+  ]
+}
