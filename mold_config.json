@@ -1,0 +1,11 @@
+{
+  "mode": "global",
+  "cleanThresholdCycles": 250,
+  "dueSoonRatio": 0.85,
+  "perSizeThresholds": {
+    "1": 250,
+    "2": 250,
+    "3": 250,
+    "4": 250
+  }
+}

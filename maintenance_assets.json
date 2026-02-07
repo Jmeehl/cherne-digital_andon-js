@@ -1,0 +1,75 @@
+{
+  "machine-shop": [
+    { "code": "CHE-MILLTURN-001", "name": "PUMA MX2100ST MILLTURN" },
+    { "code": "CHE-MILLTURN-002", "name": "PUMA SMX3100ST MILLTURN" },
+    { "code": "CHE-MILLTURN-003", "name": "PUMA TT1800SY MILLTURN" },
+    { "code": "CHE-Lathe-005 (60000004)", "name": "HAAS TL3 LATHE" },
+    { "code": "CHE-MILL-4 (60000071)", "name": "MILLTAP 700" },
+    { "code": "CHE-WJET-4", "name": "WARDJET DUAL HEAD WATERJET" },
+    { "code": "CHE-WJET-2", "name": "FLOW WATERJET" }
+  ],
+  "clean-seal": [
+    { "code": 11111, "name": "PLACEHOLDER - Asset A (Clean Seal)" },
+    { "code": 11112, "name": "PLACEHOLDER - Asset B (Clean Seal)" }
+  ],
+  "extension-hose": [
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Extension Hose)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Extension Hose)" }
+  ],
+  "end-element": [
+    { "code": 0, "name": "PLACEHOLDER - Asset A (End Element)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (End Element)" }
+  ],
+  "robot-finishing": [
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Robot Finishing)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Robot Finishing)" }
+  ],
+  "large-ball-testing": [
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Large Ball Testing)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Large Ball Testing)" }
+  ],
+  "small-ball-testing": [
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Small Ball Testing)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Small Ball Testing)" }
+  ],
+  "small-ball-assembly": [
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Small Ball Assembly)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Small Ball Assembly)" }
+  ],
+  "large-ball-assembly": [
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Large Ball Assembly)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Large Ball Assembly)" }
+  ],
+  "discrete": [
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Discrete)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Discrete)" }
+  ],
+  "tubes-inserts": [
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Tubes & Inserts)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Tubes & Inserts)" }
+  ],
+  "poly-lift-line": [
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Poly Lift Line)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Poly Lift Line)" }
+  ],
+  "taniq-robot-1": [
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Taniq Robot #1)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Taniq Robot #1)" }
+  ],
+  "taniq-robot-2": [
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Taniq Robot #2)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Taniq Robot #2)" }
+  ],
+  "autoclave": [
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Autoclave)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Autoclave)" }
+  ],
+  "waterjet-rubber": [
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Waterjet Rubber)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Waterjet Rubber)" }
+  ],
+  "baking": [
+    { "code": "CHE-OVEN-007", "name": "BIG OVEN" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Baking)" }
+  ]
+}

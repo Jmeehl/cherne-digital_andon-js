@@ -1,0 +1,771 @@
+{
+  "active": {
+    "quality": {
+      "machine-shop": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "clean-seal": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "extension-hose": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "end-element": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "robot-finishing": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "large-ball-testing": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "small-ball-testing": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "small-ball-assembly": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "large-ball-assembly": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "discrete": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "tubes-inserts": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "poly-lift-line": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "taniq-robot-1": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "taniq-robot-2": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "autoclave": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "waterjet-rubber": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "baking": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      }
+    },
+    "mfg-eng": {
+      "machine-shop": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "clean-seal": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "extension-hose": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "end-element": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "robot-finishing": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "large-ball-testing": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "small-ball-testing": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "small-ball-assembly": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "large-ball-assembly": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "discrete": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "tubes-inserts": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "poly-lift-line": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "taniq-robot-1": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "taniq-robot-2": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "autoclave": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "waterjet-rubber": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "baking": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      }
+    },
+    "supervisor": {
+      "machine-shop": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "clean-seal": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "extension-hose": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "end-element": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "robot-finishing": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "large-ball-testing": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "small-ball-testing": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "small-ball-assembly": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "large-ball-assembly": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "discrete": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "tubes-inserts": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "poly-lift-line": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "taniq-robot-1": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "taniq-robot-2": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "autoclave": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "waterjet-rubber": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "baking": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      }
+    },
+    "safety": {
+      "machine-shop": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "clean-seal": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "extension-hose": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "end-element": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "robot-finishing": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "large-ball-testing": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "small-ball-testing": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "small-ball-assembly": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "large-ball-assembly": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "discrete": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "tubes-inserts": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "poly-lift-line": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "taniq-robot-1": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "taniq-robot-2": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "autoclave": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "waterjet-rubber": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      },
+      "baking": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "callId": null
+      }
+    },
+    "maintenance": {
+      "machine-shop": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "tickets": [
+          {
+            "ticketId": "mnt_1769961923347_0380b513",
+            "status": "COMPLETED",
+            "createdAt": 1769958587139,
+            "priority": "High",
+            "issue": "The machine is currently on fire.",
+            "assetLabel": "PUMA SMX3100ST MILLTURN",
+            "fiix": {
+              "workOrderId": 155683632,
+              "workOrderNumber": "97584",
+              "url": "https://oateyscs.macmms.com/2",
+              "requestDescription": "The machine is currently on fire.",
+              "requestPriority": "High",
+              "requestAsset": "PUMA SMX3100ST MILLTURN"
+            },
+            "completedAt": 1769961957779,
+            "completedBy": "Jesse Meehl",
+            "result": "Resolved",
+            "solutionNote": "Completed"
+          },
+          {
+            "ticketId": "mnt_1769962007443_e87e04ce",
+            "status": "COMPLETED",
+            "createdAt": 1769962007443,
+            "priority": "Medium",
+            "issue": "The machine is having autodoor issues",
+            "assetLabel": "PUMA SMX3100ST MILLTURN",
+            "fiix": {
+              "workOrderId": 155685675,
+              "workOrderNumber": "97585",
+              "url": "https://oateyscs.macmms.com/2",
+              "requestDescription": "The machine is having autodoor issues",
+              "requestPriority": "Medium",
+              "requestAsset": "PUMA SMX3100ST MILLTURN"
+            },
+            "completedAt": 1769963757575,
+            "completedBy": "Jesse Meehl",
+            "result": "Resolved",
+            "solutionNote": "fixed autodoor"
+          },
+          {
+            "ticketId": "mnt_1769963782630_03776a97",
+            "status": "COMPLETED",
+            "createdAt": 1769963782630,
+            "priority": "Medium",
+            "issue": "autodoor stuck",
+            "assetLabel": "PUMA TT1800SY MILLTURN",
+            "fiix": {
+              "workOrderId": 155686183,
+              "workOrderNumber": "97586",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "autodoor stuck",
+              "requestPriority": "Medium",
+              "requestAsset": "PUMA TT1800SY MILLTURN"
+            },
+            "completedAt": 1769964988821,
+            "completedBy": "Jesse Meehl",
+            "result": "Resolved",
+            "solutionNote": ""
+          },
+          {
+            "ticketId": "mnt_1769964335293_308ce81e",
+            "status": "COMPLETED",
+            "createdAt": 1769964335293,
+            "priority": "Medium",
+            "issue": "another thing is broken",
+            "assetLabel": "PUMA TT1800SY MILLTURN",
+            "fiix": {
+              "workOrderId": 155686262,
+              "workOrderNumber": "97587",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "another thing is broken",
+              "requestPriority": "Medium",
+              "requestAsset": "PUMA TT1800SY MILLTURN"
+            },
+            "completedAt": 1769964983183,
+            "completedBy": "Jesse Meehl",
+            "result": "Resolved",
+            "solutionNote": "fixed"
+          },
+          {
+            "ticketId": "mnt_1769965008297_de12cf51",
+            "status": "COMPLETED",
+            "createdAt": 1769965008297,
+            "priority": "Medium",
+            "issue": "broke1",
+            "assetLabel": "PUMA SMX3100ST MILLTURN",
+            "fiix": {
+              "workOrderId": 155686379,
+              "workOrderNumber": "97588",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "broke1",
+              "requestPriority": "Medium",
+              "requestAsset": "PUMA SMX3100ST MILLTURN"
+            },
+            "completedAt": 1769996615993,
+            "completedBy": "Jesse Meehl",
+            "result": "Resolved",
+            "solutionNote": "Fixed"
+          },
+          {
+            "ticketId": "mnt_1769965018573_0fb139dc",
+            "status": "COMPLETED",
+            "createdAt": 1769965018573,
+            "priority": "Medium",
+            "issue": "broke 2",
+            "assetLabel": "PUMA TT1800SY MILLTURN",
+            "fiix": {
+              "workOrderId": 155686381,
+              "workOrderNumber": "97589",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "broke 2",
+              "requestPriority": "Medium",
+              "requestAsset": "PUMA TT1800SY MILLTURN"
+            },
+            "completedAt": 1769989677507,
+            "completedBy": "Jesse Meehl",
+            "result": "Resolved",
+            "solutionNote": "Fixed"
+          },
+          {
+            "ticketId": "mnt_1769996894476_523a0588",
+            "status": "COMPLETED",
+            "createdAt": 1769996894476,
+            "priority": "High",
+            "issue": "needs new batteries",
+            "assetLabel": "PUMA SMX3100ST MILLTURN",
+            "progressStatus": "Waiting for parts",
+            "fiix": {
+              "workOrderId": 155704442,
+              "workOrderNumber": "97590",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "needs new batteries",
+              "requestPriority": "High",
+              "requestAsset": "PUMA SMX3100ST MILLTURN"
+            },
+            "completedAt": 1769997934826,
+            "completedBy": "Jesse Meehl",
+            "result": "Resolved",
+            "solutionNote": "api test"
+          },
+          {
+            "ticketId": "mnt_1770030690580_c345b68c",
+            "status": "COMPLETED",
+            "createdAt": 1770030690580,
+            "priority": "Medium",
+            "issue": "API Test",
+            "assetLabel": "PUMA MX2100ST MILLTURN",
+            "progressStatus": "Waiting for parts",
+            "fiix": {
+              "workOrderId": 155765027,
+              "workOrderNumber": "97713",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "API Test",
+              "requestPriority": "Medium",
+              "requestAsset": "PUMA MX2100ST MILLTURN"
+            },
+            "completedAt": 1770066474609,
+            "completedBy": "Lyle Skalsky",
+            "result": "Resolved",
+            "solutionNote": "Completed request"
+          },
+          {
+            "ticketId": "mnt_1770044481587_49bf7574",
+            "status": "COMPLETED",
+            "createdAt": 1770044481587,
+            "priority": "Medium",
+            "issue": "Broken chuck",
+            "assetLabel": "PUMA MX2100ST MILLTURN",
+            "progressStatus": "Waiting for parts",
+            "fiix": {
+              "workOrderId": 155785567,
+              "workOrderNumber": "97720",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "Broken chuck",
+              "requestPriority": "Medium",
+              "requestAsset": "PUMA MX2100ST MILLTURN"
+            },
+            "completedAt": 1770116224256,
+            "completedBy": "Daniel Wellens",
+            "result": "Resolved",
+            "solutionNote": "fixed chuck"
+          },
+          {
+            "ticketId": "mnt_1770048890223_12d51179",
+            "status": "COMPLETED",
+            "createdAt": 1770048890223,
+            "priority": "Medium",
+            "issue": "It broke",
+            "assetLabel": "PUMA TT1800SY MILLTURN",
+            "progressStatus": "In progress",
+            "fiix": {
+              "workOrderId": 155791821,
+              "workOrderNumber": "97723",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "It broke",
+              "requestPriority": "Medium",
+              "requestAsset": "PUMA TT1800SY MILLTURN"
+            },
+            "completedAt": 1770048957220,
+            "completedBy": "Hollis Fritts",
+            "result": "Resolved",
+            "solutionNote": "Fixed"
+          },
+          {
+            "ticketId": "mnt_1770233073946_896d4bbf",
+            "status": "COMPLETED",
+            "createdAt": 1770233073946,
+            "priority": "Medium",
+            "issue": "Broke",
+            "assetLabel": "PUMA MX2100ST MILLTURN",
+            "progressStatus": "In progress",
+            "fiix": {
+              "workOrderId": 155999420,
+              "workOrderNumber": "97779",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "Broke",
+              "requestPriority": "Medium",
+              "requestAsset": "PUMA MX2100ST MILLTURN"
+            },
+            "completedAt": 1770240113886,
+            "completedBy": "Hollis Fritts",
+            "result": "Resolved",
+            "solutionNote": "Greased chucks and tightened draw nut."
+          },
+          {
+            "ticketId": "mnt_1770342884052_bbdc67b6",
+            "status": "COMPLETED",
+            "createdAt": 1770342884052,
+            "priority": "Medium",
+            "issue": "Broken tool",
+            "assetLabel": "PUMA MX2100ST MILLTURN",
+            "progressStatus": "",
+            "fiix": {
+              "workOrderId": 156095547,
+              "workOrderNumber": "97809",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "Broken tool",
+              "requestPriority": "Medium",
+              "requestAsset": "PUMA MX2100ST MILLTURN"
+            },
+            "completedAt": 1770379781684,
+            "completedBy": "Hollis Fritts",
+            "result": "Resolved",
+            "solutionNote": "Fixed"
+          }
+        ]
+      },
+      "clean-seal": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "tickets": []
+      },
+      "extension-hose": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "tickets": []
+      },
+      "end-element": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "tickets": []
+      },
+      "robot-finishing": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "tickets": []
+      },
+      "large-ball-testing": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "tickets": []
+      },
+      "small-ball-testing": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "tickets": []
+      },
+      "small-ball-assembly": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "tickets": []
+      },
+      "large-ball-assembly": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "tickets": []
+      },
+      "discrete": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "tickets": []
+      },
+      "tubes-inserts": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "tickets": []
+      },
+      "poly-lift-line": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "tickets": []
+      },
+      "taniq-robot-1": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "tickets": []
+      },
+      "taniq-robot-2": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "tickets": []
+      },
+      "autoclave": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "tickets": []
+      },
+      "waterjet-rubber": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "tickets": []
+      },
+      "baking": {
+        "status": "READY",
+        "requestedAt": null,
+        "fiix": null,
+        "tickets": []
+      }
+    }
+  }
+}
