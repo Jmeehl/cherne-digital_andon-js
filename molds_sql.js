@@ -54,18 +54,18 @@ export async function fetchLatestMolds() {
   const pool = await getPool();
   const result = await pool.request().query(`
     WITH ranked AS (
-      SELECT
+       SELECT
         MoldNumber,
         MoldSize,
-        CyclesSinceLastCleaning,
-        TTDCycles,
-        Extract_DateTime,
         MoldClose_DateTime,
++       Extract_DateTime,
+        Plug_Present_In_Mold,
         ROW_NUMBER() OVER (
-          PARTITION BY MoldNumber
-          ORDER BY Extract_DateTime DESC, MoldClose_DateTime DESC
+          PARTITION BY MoldNumber, MoldClose_DateTime
+          ORDER BY Extract_DateTime DESC
         ) AS rn
       FROM dbo.MoldData
+...
       WHERE MoldNumber IS NOT NULL
     )
     SELECT
@@ -218,4 +218,53 @@ export async function fetchOvenRealtime({ startDate, endDate, bucketMinutes = 5 
   const metaRow = Array.isArray(meta.recordset) ? meta.recordset[0] : null;
 
   return { rows, meta: metaRow ?? null };
+}
+
+// molds_sql.js
+// Counts filled vs empty molds per bucket (Plug_Present_In_Mold 1/0) and totals for a range.
+
+export async function fetchOvenFillStats({ startDate, endDate, bucketMinutes = 5 }) {
+  const pool = await getPool();
+  const bucket = Math.max(1, Math.min(60, Number(bucketMinutes) || 5));
+
+  const result = await pool.request()
+    .input("start", sql.DateTime2, startDate)
+    .input("end", sql.DateTime2, endDate)
+    .input("bucket", sql.Int, bucket)
+    .query(`
+      ;WITH base AS (
+        SELECT
+          MoldNumber,
+          MoldSize,
+          MoldClose_DateTime,
+          Plug_Present_In_Mold,
+          ROW_NUMBER() OVER (
+            PARTITION BY MoldNumber, MoldClose_DateTime
+            ORDER BY Extract_DateTime DESC
+          ) AS rn
+        FROM dbo.MoldData
+        WHERE
+          MoldClose_DateTime IS NOT NULL
+          AND MoldClose_DateTime >= @start
+          AND MoldClose_DateTime < @end
+      ),
+      events AS (
+        SELECT
+          DATEADD(minute, (DATEDIFF(minute, 0, MoldClose_DateTime) / @bucket) * @bucket, 0) AS BucketTime,
+          MoldSize AS PlugSize,
+          CASE WHEN Plug_Present_In_Mold = 1 THEN 1 ELSE 0 END AS IsFilled
+        FROM base
+        WHERE rn = 1
+      )
+      SELECT
+        BucketTime,
+        PlugSize,
+        IsFilled,
+        COUNT(*) AS Cnt
+      FROM events
+      GROUP BY BucketTime, PlugSize, IsFilled
+      ORDER BY BucketTime ASC, PlugSize ASC, IsFilled ASC;
+    `);
+
+  return Array.isArray(result.recordset) ? result.recordset : [];
 }

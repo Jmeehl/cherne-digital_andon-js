@@ -8,6 +8,7 @@ import fs from "fs";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
 import { Server } from "socket.io";
+import { fetchOvenFillStats } from "./molds_sql.js";
 
 import {
   fetchLatestMolds,
@@ -936,52 +937,97 @@ function parseRange(req) {
 }
 
 // Hourly chart (date range)
+// 5-minute bucket chart with continuous timeline + zero-filled gaps.
+// Uses fetchOvenRealtime() which returns BucketTime, PlugSize, CloseCount. [2](https://oateyscs-my.sharepoint.com/personal/jmeehl_oatey_com/Documents/Microsoft%20Copilot%20Chat%20Files/molds.html)
+// 5-minute bucket chart with continuous timeline + zero-filled gaps.
+// Adds KPIs: efficiency + time loss from empty molds.
 app.get("/api/oven/plug-performance", async (req, res) => {
   try {
     const { start, end } = parseRange(req);
 
-    // Fetch sparse rows from SQL (only hours/sizes that occurred)
-    const rows = await fetchPlugPerformanceByHour(start, end);
+    const bucketMinutes = 5;
+    const bucketMs = bucketMinutes * 60 * 1000;
 
-    // In server.js inside GET /api/oven/plug-performance
-// After you fetch rows = await fetchPlugPerformanceByHour(start, end);
+    // Floor timestamps to 5-min boundaries (UTC) so keys align with toISOString()
+    const floorToBucketUTC = (d) => {
+      const x = new Date(d);
+      const mins = x.getUTCMinutes();
+      const floored = Math.floor(mins / bucketMinutes) * bucketMinutes;
+      x.setUTCMinutes(floored, 0, 0);
+      return x;
+    };
 
-const floorToHourUTC = (d) => {
-  const x = new Date(d);
-  x.setUTCMinutes(0, 0, 0);
-  return x;
-};
+    const startB = floorToBucketUTC(start);
+    const endB = floorToBucketUTC(end);
 
-const startH = floorToHourUTC(start);
-const endH = floorToHourUTC(end);
+    // Build continuous buckets
+    const buckets = [];
+    for (let t = startB.getTime(); t <= endB.getTime(); t += bucketMs) {
+      buckets.push(new Date(t).toISOString());
+    }
 
-// Build continuous hour list (UTC ISO strings)
-const hours = [];
-for (let t = startH.getTime(); t <= endH.getTime(); t += 60 * 60 * 1000) {
-  hours.push(new Date(t).toISOString());
-}
+    // ✅ Pull filled vs empty counts
+    const rows = await fetchOvenFillStats({
+      startDate: startB,
+      endDate: new Date(endB.getTime() + bucketMs), // include last bucket window
+      bucketMinutes
+    });
 
-// Gather sizes
-const sizeSet = new Set();
-for (const r of rows) sizeSet.add(String(r.PlugSize));
-const sizes = Array.from(sizeSet).sort((a, b) => Number(a) - Number(b));
+    // Determine sizes (fallback to 1-4 if no data)
+    const sizeSet = new Set();
+    for (const r of rows) sizeSet.add(String(r.PlugSize));
+    const sizes = (sizeSet.size ? Array.from(sizeSet) : ["1", "2", "3", "4"])
+      .sort((a, b) => Number(a) - Number(b));
 
-// Map sparse results
-const byKey = new Map();
-for (const r of rows) {
-  const h = floorToHourUTC(r.HourBucket).toISOString();
-  const s = String(r.PlugSize);
-  byKey.set(`${h}|${s}`, Number(r.CompletedCount) || 0);
-}
+    // Build filled-only series + KPI totals
+    const filledMap = new Map(); // key: bucketISO|size -> count
+    let filledTotal = 0;
+    let emptyTotal = 0;
 
-// Fill series across full hours with 0s
-const series = {};
-for (const s of sizes) {
-  series[s] = hours.map((h) => byKey.get(`${h}|${s}`) ?? 0);
-}
+    for (const r of rows) {
+      const b = floorToBucketUTC(r.BucketTime).toISOString();
+      const s = String(r.PlugSize);
+      const cnt = Number(r.Cnt) || 0;
+      const isFilled = Number(r.IsFilled) === 1;
 
-res.json({ ok: true, start: start.toISOString(), end: end.toISOString(), hours, sizes, series });
+      if (isFilled) {
+        filledTotal += cnt;
+        filledMap.set(`${b}|${s}`, (filledMap.get(`${b}|${s}`) ?? 0) + cnt);
+      } else {
+        emptyTotal += cnt;
+      }
+    }
 
+    // Filled-only series aligned to continuous buckets (zero-filled)
+    const series = {};
+    for (const s of sizes) {
+      series[s] = buckets.map((b) => filledMap.get(`${b}|${s}`) ?? 0);
+    }
+
+    // ✅ KPIs
+    const totalCycles = filledTotal + emptyTotal;
+    const efficiencyPct = totalCycles > 0
+      ? Math.round((filledTotal / totalCycles) * 1000) / 10   // 1 decimal
+      : null;
+
+    const lostSeconds = emptyTotal * 15; // 15s per empty mold
+
+    res.json({
+      ok: true,
+      start: start.toISOString(),
+      end: end.toISOString(),
+      bucketMinutes,
+      buckets,
+      sizes,
+      series,
+      kpis: {
+        filledTotal,
+        emptyTotal,
+        totalCycles,
+        efficiencyPct,
+        lostSeconds
+      }
+    });
   } catch (e) {
     res.status(400).json({ ok: false, error: e.message });
   }

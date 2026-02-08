@@ -16,7 +16,7 @@ export const DEPARTMENTS = [
   { id: "mfg-eng",     name: "Manufacturing Engineering" },
   { id: "supervisor",  name: "Supervisor / Leads" },
   { id: "safety",      name: "Safety" },
-  { id: "maintenance", name: "Maintenance" } // ✅ NEW
+  { id: "maintenance", name: "Maintenance" }
 ];
 
 // ---- Cells ----

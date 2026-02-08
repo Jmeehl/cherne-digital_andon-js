@@ -13,24 +13,15 @@
       gap: 12px;
       align-items: start;
     }
-    @media (max-width: 1200px) {
-      .molds-layout { grid-template-columns: 1fr; }
-    }
-
+    @media (max-width: 1200px) { .molds-layout { grid-template-columns: 1fr; } }
     .side-stack { display: flex; flex-direction: column; gap: 12px; }
-
     .small-table-wrap { max-height: 340px; }
-
     .pill {
       display:inline-block; padding:6px 10px; border-radius:999px;
       border:1px solid #ddd; background:#f6f6f6; font-weight:900;
     }
     .theme-dark .pill { background:#151a21; border-color:#2a3139; }
-
-    .status-dot {
-      width:10px; height:10px; border-radius:999px; display:inline-block; margin-right:8px;
-      background:#999;
-    }
+    .status-dot { width:10px; height:10px; border-radius:999px; display:inline-block; margin-right:8px; background:#999; }
     .dot-ok { background: #2e7d32; }
     .dot-warn { background: #ef6c00; }
     .dot-off { background: #6f6f6f; }
@@ -43,9 +34,7 @@
     <div class="history-header">
       <div>
         <div class="history-title" id="moldsTitle">Mold Cleaning</div>
-        <div class="chart-subtitle" id="moldsSubtitle">
-          Live mold cleaning worklist (updates every minute)
-        </div>
+        <div class="chart-subtitle" id="moldsSubtitle">Live mold cleaning worklist (updates every minute)</div>
       </div>
 
       <div class="controls">
@@ -73,8 +62,19 @@
 
         <label style="font-weight:900; display:flex; align-items:center; gap:8px;">
           <input id="activeOnly" type="checkbox" />
-          Active only
+          Loaded only
         </label>
+
+        <label for="sortBy" style="font-weight:900;">Sort</label>
+        <select id="sortBy">
+          <option value="worst" selected>Worst First</option>
+          <option value="unloaded">Mold Unloaded First</option>
+          <option value="sizeNumber">Size → Mold #</option>
+          <option value="moldNumber">Mold #</option>
+          <option value="cycles">Cycles Since Cleaning</option>
+          <option value="lastNew">Last Record (Newest)</option>
+          <option value="lastOld">Last Record (Oldest)</option>
+        </select>
 
         <input id="searchMold" type="text" placeholder="Search mold #…" />
         <button id="refresh" class="btn secondary" type="button">Refresh</button>
@@ -90,15 +90,14 @@
           <table>
             <thead>
               <tr>
-                <th>Mold</th>
-                <th>Size</th>
+                <th>Mold Size</th>
                 <th>Cycles Since Cleaning</th>
                 <th>Over By</th>
                 <th>Total Cycles (TTD)</th>
                 <th>Last Record</th>
                 <th>Age (min)</th>
                 <th>Status</th>
-                <th>Active</th>
+                <th>Loaded</th>
               </tr>
             </thead>
             <tbody id="rows"></tbody>
@@ -109,30 +108,26 @@
       <!-- SIDE PANEL -->
       <div class="side-stack">
         <div class="chart-card">
-          <div class="chart-title">System (Active) Status</div>
+          <div class="chart-title">System (Loaded) Status</div>
           <div class="chart-subtitle" id="activeMeta">
-            Active = mold has a record within the last 180 minutes.
+            Loaded = Cycle missed + 30 minutes
           </div>
-
           <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
             <span class="pill" id="systemState">
               <span class="status-dot dot-off" id="systemDot"></span>
               Status: —
             </span>
-            <span class="pill" id="activeTotal">Active: —</span>
+            <span class="pill" id="activeTotal">Loaded: —</span>
             <span class="pill" id="sinceLatest">Latest Record: —</span>
           </div>
         </div>
 
         <div class="chart-card">
-          <div class="chart-title">Active by Size</div>
+          <div class="chart-title">Loaded by Size</div>
           <div class="table-wrap small-table-wrap">
             <table>
               <thead>
-                <tr>
-                  <th>Size</th>
-                  <th>Qty</th>
-                </tr>
+                <tr><th>Size</th><th>Qty</th></tr>
               </thead>
               <tbody id="activeCounts"></tbody>
             </table>
@@ -140,14 +135,11 @@
         </div>
 
         <div class="chart-card">
-          <div class="chart-title">Active Molds</div>
+          <div class="chart-title">Loaded Molds</div>
           <div class="table-wrap small-table-wrap">
             <table>
               <thead>
-                <tr>
-                  <th>Mold</th>
-                  <th>Age</th>
-                </tr>
+                <tr><th>Mold</th><th>Age</th></tr>
               </thead>
               <tbody id="activeMolds"></tbody>
             </table>

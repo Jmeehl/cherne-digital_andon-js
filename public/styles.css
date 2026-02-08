@@ -610,6 +610,9 @@ h1{
   padding: 8px 10px;
   font-size: 16px;
 }
+.controls label {
+  margin-bottom: 0 !important;
+}
 
 .controls a{
   text-decoration: none;
@@ -1221,4 +1224,55 @@ tbody td.note{ white-space: normal; }
 
 .theme-dark .table-wrap::-webkit-scrollbar-thumb:hover {
   background: #3a4450;
+}
+
+/* =========================================================
+   CONTROL ROW ALIGNMENT FIX
+   - Buttons in inline controls should not use the global .btn margin-top
+   - Align inputs/selects/buttons consistently
+   ========================================================= */
+
+/* Mold Cleaning (uses .controls container) */
+.controls {
+  align-items: center; /* was effectively baseline-ish; center fixes mixed elements */
+}
+
+.controls .btn {
+  margin-top: 0 !important; /* override global .btn margin-top:14px */
+}
+
+/* Oven page (uses .oven-controls container defined in oven.html) */
+.oven-controls {
+  align-items: top; /* matches Mold page */
+}
+
+.oven-controls .btn {
+  margin-top: 10px !important;
+}
+
+/* Optional: make controls feel uniform */
+.controls input,
+.controls select,
+.controls button,
+.oven-controls input,
+.oven-controls select,
+.oven-controls button {
+  height: 40px;
+}
+
+
+
+/* =========================================================
+   DARK MODE: Oven controls inputs/selects (datetime-local, select)
+   ========================================================= */
+.theme-dark .oven-controls input,
+.theme-dark .oven-controls select {
+  background: #0f1419;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+/* Some browsers render datetime fields with internal parts */
+.theme-dark .oven-controls input[type="datetime-local"] {
+  color-scheme: dark;
 }

@@ -1,5 +1,5 @@
 // public/sw.js
-const CACHE_NAME = "cherne-assist-v1";
+const CACHE_NAME = "cherne-assist-v1.5.1";
 
 // Add only truly static assets here.
 // You can expand this list later if desired.
