@@ -6,7 +6,8 @@
     { "code": "CHE-Lathe-005 (60000004)", "name": "HAAS TL3 LATHE" },
     { "code": "CHE-MILL-4 (60000071)", "name": "MILLTAP 700" },
     { "code": "CHE-WJET-4", "name": "WARDJET DUAL HEAD WATERJET" },
-    { "code": "CHE-WJET-2", "name": "FLOW WATERJET" }
+    { "code": "CHE-WJET-2 (60000036)", "name": "FLOW WATERJET" },
+    { "code": "CHE-Lathe-006 (60000070)", "name": "FRYER SL8 LATHE" }
   ],
   "clean-seal": [
     { "code": 11111, "name": "PLACEHOLDER - Asset A (Clean Seal)" },
@@ -53,7 +54,7 @@
     { "code": 0, "name": "PLACEHOLDER - Asset B (Poly Lift Line)" }
   ],
   "taniq-robot-1": [
-    { "code": 0, "name": "PLACEHOLDER - Asset A (Taniq Robot #1)" },
+    { "code": "CHE-HEAT-TAPE-REMOVER-001", "name": "ROBOT #1 TAPE REMOVER" },
     { "code": 0, "name": "PLACEHOLDER - Asset B (Taniq Robot #1)" }
   ],
   "taniq-robot-2": [
@@ -61,12 +62,12 @@
     { "code": 0, "name": "PLACEHOLDER - Asset B (Taniq Robot #2)" }
   ],
   "autoclave": [
-    { "code": 0, "name": "PLACEHOLDER - Asset A (Autoclave)" },
-    { "code": 0, "name": "PLACEHOLDER - Asset B (Autoclave)" }
+    { "code": "CHE-HEPR-002 (60000158)", "name": "LABEL HEAT PRESS" },
+    { "code": "CHE-HTS-001", "name": "HEAT TAPE REMOVER (OLD))" },
+    { "code": "CHE-HTS-002", "name": "HEAT TAPE REMOVER (NEW))" }
   ],
   "waterjet-rubber": [
-    { "code": 0, "name": "PLACEHOLDER - Asset A (Waterjet Rubber)" },
-    { "code": 0, "name": "PLACEHOLDER - Asset B (Waterjet Rubber)" }
+    { "code": "CHE-WJET-3", "name": "WARDJET RUBBER WATERJET" }
   ],
   "baking": [
     { "code": "CHE-OVEN-007", "name": "BIG OVEN" },

@@ -667,6 +667,46 @@
             "completedBy": "Hollis Fritts",
             "result": "Resolved",
             "solutionNote": "Fixed"
+          },
+          {
+            "ticketId": "mnt_1770560610780_d765c254",
+            "status": "COMPLETED",
+            "createdAt": 1770560610780,
+            "priority": "Medium",
+            "issue": "Proximity sensor not detecting",
+            "assetLabel": "PUMA TT1800SY MILLTURN",
+            "progressStatus": "Locked and tagged out",
+            "fiix": {
+              "workOrderId": 156238334,
+              "workOrderNumber": "97852",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "Proximity sensor not detecting",
+              "requestPriority": "Medium",
+              "requestAsset": "PUMA TT1800SY MILLTURN"
+            },
+            "completedAt": 1770560747969,
+            "completedBy": "Jesse Meehl",
+            "result": "Resolved",
+            "solutionNote": "Replaced proximity sensor"
+          },
+          {
+            "ticketId": "mnt_1770561481616_d99b1823",
+            "status": "CANCELLED",
+            "createdAt": 1770561481616,
+            "priority": "Medium",
+            "issue": "broke",
+            "assetLabel": "HAAS TL3 LATHE",
+            "progressStatus": "",
+            "fiix": {
+              "workOrderId": 156238466,
+              "workOrderNumber": "97853",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "broke",
+              "requestPriority": "Medium",
+              "requestAsset": "HAAS TL3 LATHE",
+              "cancelError": "FIIX_WO_STATUS_ID_CANCELLED is not set."
+            },
+            "cancelledAt": 1770561497265
           }
         ]
       },

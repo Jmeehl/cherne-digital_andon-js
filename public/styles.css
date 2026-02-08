@@ -1276,3 +1276,5 @@ tbody td.note{ white-space: normal; }
 .theme-dark .oven-controls input[type="datetime-local"] {
   color-scheme: dark;
 }
+
+.nav-logo { cursor: pointer; }

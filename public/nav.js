@@ -1,12 +1,13 @@
 // public/nav.js
 // Navigation builder
-// - Tablet cell pages (/cell/:id): minimal nav + language selector; NO pickers/links.
-// - Dashboard/history + other non-tablet pages: context link, dept picker, cell picker, theme toggle, responders button (history only).
+// - Tablet cell pages (/cell/:id): minimal nav + language selector; NO pickers/links; NO logo hover swap.
+// - Dashboard/history + molds/oven: logo + title + links + pickers + theme toggle.
+
 (() => {
   const mount = document.getElementById("topnav");
   if (!mount) return;
 
-  // -------- safe escaping (FIXED) --------
+  // ---------- safe escaping (FIXED) ----------
   function escapeHtml(str) {
     return String(str ?? "")
       .replaceAll("&", "&amp;")
@@ -21,9 +22,8 @@
 
   const parts = location.pathname.split("/").filter(Boolean);
   const pageType = parts[0] ?? ""; // dashboard | history | cell | molds | oven
-  const pageKey = parts[1] ?? "";  // deptId or cellId (for dashboard/history/cell)
+  const pageKey = parts[1] ?? "";
 
-  // -------- config --------
   async function fetchConfig() {
     try {
       const r = await fetch("/api/config", { cache: "no-store" });
@@ -33,9 +33,8 @@
     }
   }
 
-  // -------- theme (dashboard/history + selected non-tablet pages) --------
+  // ---------- theme ----------
   function isThemeCapablePage() {
-    // Add non-tablet pages that should support dark mode here:
     return pageType === "dashboard" || pageType === "history" || pageType === "molds" || pageType === "oven";
   }
 
@@ -51,7 +50,7 @@
     return { isDark, key };
   }
 
-  // -------- i18n helpers (tablet only) --------
+  // ---------- i18n (tablet only) ----------
   const LANG_KEY = "cherneassist_lang";
   function getSavedLang() {
     return (localStorage.getItem(LANG_KEY) ?? "en").toLowerCase();
@@ -62,17 +61,30 @@
         await I18N.load(lang);
         return true;
       }
-    } catch { /* ignore */ }
+    } catch {}
     return false;
   }
   function t(key, vars) {
     try {
       if (typeof I18N !== "undefined" && I18N?.t) return I18N.t(key, vars);
-    } catch { /* ignore */ }
+    } catch {}
     if (!vars) return key;
     let s = key;
     for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{{${k}}}`, String(v));
     return s;
+  }
+
+  // ---------- logo hover swap (NON-TABLET ONLY) ----------
+  function wireLogoHoverSwap() {
+    if (pageType === "cell") return; // ✅ do not apply on tablets
+    const logo = document.getElementById("navLogo");
+    if (!logo) return;
+
+    const def = logo.getAttribute("data-default") || "/assets/logo.svg";
+    const hov = logo.getAttribute("data-hover") || def;
+
+    logo.addEventListener("mouseenter", () => { logo.src = hov; });
+    logo.addEventListener("mouseleave", () => { logo.src = def; });
   }
 
   (async () => {
@@ -81,7 +93,7 @@
     const cells = Array.isArray(config.cells) ? config.cells : [];
 
     // =====================================================
-    // CELL PAGE (TABLETS): minimal nav + language selector
+    // TABLET CELL PAGE
     // =====================================================
     if (pageType === "cell") {
       const lang = getSavedLang();
@@ -128,11 +140,9 @@
     }
 
     // =====================================================
-    // Determine "dept context" for non-tablet pages
+    // NON-TABLET PAGES (dashboard/history/molds/oven/etc.)
+    // Determine dept context
     // =====================================================
-    // - dashboard/history: dept comes from URL (/dashboard/:dept)
-    // - molds page: treat as maintenance-themed
-    // - oven page: treat as supervisor-themed
     const currentDept =
       (pageType === "dashboard" || pageType === "history")
         ? (pageKey || "quality")
@@ -144,9 +154,6 @@
 
     const themeInfo = applyThemeForDept(currentDept);
 
-    // =====================================================
-    // DASHBOARD / HISTORY / MOLDS / OVEN NAV
-    // =====================================================
     const contextLinkHtml =
       pageType === "dashboard"
         ? `<a href="/history/${encodeURIComponent(currentDept)}">${escapeHtml("History")}</a>`
@@ -154,14 +161,11 @@
           ? `<a href="/dashboard/${encodeURIComponent(currentDept)}">${escapeHtml("Back to Dashboard")}</a>`
           : "";
 
-    // ✅ Supervisor-only: Oven Performance link (visible on supervisor dashboards & supervisor-associated pages)
     const ovenLinkHtml =
       (pageType === "dashboard" || pageType === "history") && currentDept === "supervisor"
         ? `<a href="/oven">${escapeHtml("Oven Performance")}</a>`
         : "";
 
-    // ✅ Maintenance dashboard: Mold Cleaning link in nav
-    // Note: also show it when you're on /molds itself (handy to "refresh"/stay consistent)
     const moldLinkHtml =
       (pageType === "dashboard" && currentDept === "maintenance")
         ? `<a href="/molds">${escapeHtml("Mold Cleaning")}</a>`
@@ -172,31 +176,31 @@
         ? `<button id="navManageResponders" class="btn secondary" type="button">${escapeHtml("Manage Responders")}</button>`
         : "";
 
-    // Dept picker only makes sense on dashboard/history
     const showDeptPicker =
-      pageType === "dashboard" ||
-      pageType === "history" ||
-      pageType === "molds" ||
-      pageType === "oven";
-    const deptOptionsHtml = depts
-      .map((d) => {
-        const selected = d.id === currentDept ? "selected" : "";
-        return `<option value="${escapeAttr(d.id)}" ${selected}>${escapeHtml(d.name)}</option>`;
-      })
-      .join("");
+      pageType === "dashboard" || pageType === "history" || pageType === "molds" || pageType === "oven";
 
-    // Cell picker useful on all non-tablet pages (lets staff jump to a tablet view)
+    const deptOptionsHtml = depts.map((d) => {
+      const selected = d.id === currentDept ? "selected" : "";
+      return `<option value="${escapeAttr(d.id)}" ${selected}>${escapeHtml(d.name)}</option>`;
+    }).join("");
+
     const cellOptionsHtml =
       `<option value="">${escapeHtml("Select…")}</option>` +
       cells.map((c) => `<option value="${escapeAttr(c.id)}">${escapeHtml(c.name)}</option>`).join("");
 
-    // Theme toggle shown on theme-capable pages (dashboard/history/molds/oven)
     const showThemeToggle = isThemeCapablePage();
 
     mount.innerHTML = `
       <div class="topnav">
         <div class="left">
-          <img class="nav-logo" src="/assets/logo.svg" alt="Cherne" />
+          <img
+            id="navLogo"
+            class="nav-logo"
+            src="/assets/logo.svg"
+            data-default="/assets/logo.svg"
+            data-hover="/assets/logo-hover.svg"
+            alt="Cherne Assist"
+          />
           <span class="nav-title">CHERNE Assist</span>
           ${contextLinkHtml}
           ${ovenLinkHtml}
@@ -233,6 +237,9 @@
       </div>
     `;
 
+    // ✅ wire hover swap AFTER HTML is inserted (and not on tablets)
+    wireLogoHoverSwap();
+
     // Dept picker
     const dashPicker = document.getElementById("dashPicker");
     dashPicker?.addEventListener("change", () => {
@@ -260,7 +267,7 @@
       document.documentElement.classList.toggle("theme-dark", next);
     });
 
-    // Responders modal event (history only)
+    // Responders modal event
     const navManageBtn = document.getElementById("navManageResponders");
     navManageBtn?.addEventListener("click", () => {
       window.dispatchEvent(new CustomEvent("flooralerts:openResponders"));
