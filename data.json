@@ -707,6 +707,27 @@
               "cancelError": "FIIX_WO_STATUS_ID_CANCELLED is not set."
             },
             "cancelledAt": 1770561497265
+          },
+          {
+            "ticketId": "mnt_1770728883935_9810140a",
+            "status": "COMPLETED",
+            "createdAt": 1770728883935,
+            "priority": "Low",
+            "issue": "Testing....Hi Hollis",
+            "assetLabel": "MILLTAP 700",
+            "progressStatus": "Waiting for vendor — Done",
+            "fiix": {
+              "workOrderId": 156414800,
+              "workOrderNumber": "98002",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "Testing....Hi Hollis",
+              "requestPriority": "Low",
+              "requestAsset": "MILLTAP 700"
+            },
+            "completedAt": 1770728941860,
+            "completedBy": "Hollis Fritts",
+            "result": "Resolved",
+            "solutionNote": "teset"
           }
         ]
       },

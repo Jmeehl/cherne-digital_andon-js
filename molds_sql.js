@@ -25,6 +25,7 @@ export function getSqlConfigFromEnv() {
     options: {
       encrypt: String(process.env.MSSQL_ENCRYPT ?? "false") === "true",
       trustServerCertificate: String(process.env.MSSQL_TRUST_CERT ?? "true") === "true",
+      useUTC: false   // ✅ IMPORTANT: treat SQL datetime as local time
     },
     pool: {
       max: 5,
@@ -54,18 +55,18 @@ export async function fetchLatestMolds() {
   const pool = await getPool();
   const result = await pool.request().query(`
     WITH ranked AS (
-       SELECT
+      SELECT
         MoldNumber,
         MoldSize,
+        CyclesSinceLastCleaning,
+        TTDCycles,
+        Extract_DateTime,
         MoldClose_DateTime,
-+       Extract_DateTime,
-        Plug_Present_In_Mold,
         ROW_NUMBER() OVER (
-          PARTITION BY MoldNumber, MoldClose_DateTime
-          ORDER BY Extract_DateTime DESC
+          PARTITION BY MoldNumber
+          ORDER BY Extract_DateTime DESC, MoldClose_DateTime DESC
         ) AS rn
       FROM dbo.MoldData
-...
       WHERE MoldNumber IS NOT NULL
     )
     SELECT
@@ -73,35 +74,34 @@ export async function fetchLatestMolds() {
       MoldSize,
       CyclesSinceLastCleaning,
       TTDCycles,
-      Extract_DateTime
+      Extract_DateTime,
+      MoldClose_DateTime
     FROM ranked
     WHERE rn = 1;
   `);
-
   return Array.isArray(result.recordset) ? result.recordset : [];
 }
 
 // Counts completed molds per hour by MoldSize where Plug_Present_In_Mold = 1
 export async function fetchPlugPerformanceByHour(startDate, endDate) {
   const pool = await getPool();
-
   const result = await pool
     .request()
     .input("start", sql.DateTime2, startDate)
     .input("end", sql.DateTime2, endDate)
     .query(`
       SELECT
-        DATEADD(hour, DATEDIFF(hour, 0, MoldClose_DateTime), 0) AS HourBucket,
+        DATEADD(hour, DATEDIFF(hour, 0, Extract_DateTime), 0) AS HourBucket,
         MoldSize AS PlugSize,
         COUNT(*) AS CompletedCount
       FROM dbo.MoldData
       WHERE
-        MoldClose_DateTime IS NOT NULL
-        AND MoldClose_DateTime >= @start
-        AND MoldClose_DateTime < @end
+        Extract_DateTime IS NOT NULL
+        AND Extract_DateTime >= @start
+        AND Extract_DateTime <  @end
         AND Plug_Present_In_Mold = 1
       GROUP BY
-        DATEADD(hour, DATEDIFF(hour, 0, MoldClose_DateTime), 0),
+        DATEADD(hour, DATEDIFF(hour, 0, Extract_DateTime), 0),
         MoldSize
       ORDER BY
         HourBucket ASC,
@@ -110,6 +110,7 @@ export async function fetchPlugPerformanceByHour(startDate, endDate) {
 
   return Array.isArray(result.recordset) ? result.recordset : [];
 }
+``
 
 /**
  * Realtime oven performance:
@@ -123,11 +124,9 @@ export async function fetchOvenRealtime({ startDate, endDate, bucketMinutes = 5 
   const pool = await getPool();
   const bucket = Math.max(1, Math.min(60, Number(bucketMinutes) || 5));
 
-  // Main time-series aggregation
-  const result = await pool
-    .request()
+  const result = await pool.request()
     .input("start", sql.DateTime2, startDate)
-    .input("end", sql.DateTime2, endDate)
+    .input("end",   sql.DateTime2, endDate)
     .input("bucket", sql.Int, bucket)
     .query(`
       ;WITH base AS (
@@ -138,14 +137,14 @@ export async function fetchOvenRealtime({ startDate, endDate, bucketMinutes = 5 
           Extract_DateTime,
           Plug_Present_In_Mold,
           ROW_NUMBER() OVER (
-            PARTITION BY MoldNumber, MoldClose_DateTime
+            PARTITION BY MoldNumber, Extract_DateTime
             ORDER BY Extract_DateTime DESC
           ) AS rn
         FROM dbo.MoldData
         WHERE
-          MoldClose_DateTime IS NOT NULL
-          AND MoldClose_DateTime >= @start
-          AND MoldClose_DateTime < @end
+          Extract_DateTime IS NOT NULL
+          AND Extract_DateTime >= @start
+          AND Extract_DateTime <  @end
           AND Plug_Present_In_Mold = 1
       ),
       events AS (
@@ -154,7 +153,7 @@ export async function fetchOvenRealtime({ startDate, endDate, bucketMinutes = 5 
           MoldSize,
           MoldClose_DateTime,
           Extract_DateTime,
-          DATEADD(minute, (DATEDIFF(minute, 0, MoldClose_DateTime) / @bucket) * @bucket, 0) AS BucketTime,
+          DATEADD(minute, (DATEDIFF(minute, 0, Extract_DateTime) / @bucket) * @bucket, 0) AS BucketTime,
           CASE
             WHEN Extract_DateTime IS NOT NULL AND Extract_DateTime >= MoldClose_DateTime
               THEN DATEDIFF(minute, MoldClose_DateTime, Extract_DateTime)
@@ -173,11 +172,9 @@ export async function fetchOvenRealtime({ startDate, endDate, bucketMinutes = 5 
       ORDER BY BucketTime ASC, MoldSize ASC;
     `);
 
-  // Meta: most recent close and its bake time in the same window
-  const meta = await pool
-    .request()
+  const meta = await pool.request()
     .input("start", sql.DateTime2, startDate)
-    .input("end", sql.DateTime2, endDate)
+    .input("end",   sql.DateTime2, endDate)
     .query(`
       ;WITH base AS (
         SELECT
@@ -186,19 +183,19 @@ export async function fetchOvenRealtime({ startDate, endDate, bucketMinutes = 5 
           Extract_DateTime,
           Plug_Present_In_Mold,
           ROW_NUMBER() OVER (
-            PARTITION BY MoldNumber, MoldClose_DateTime
+            PARTITION BY MoldNumber, Extract_DateTime
             ORDER BY Extract_DateTime DESC
           ) AS rn
         FROM dbo.MoldData
         WHERE
-          MoldClose_DateTime IS NOT NULL
-          AND MoldClose_DateTime >= @start
-          AND MoldClose_DateTime < @end
+          Extract_DateTime IS NOT NULL
+          AND Extract_DateTime >= @start
+          AND Extract_DateTime <  @end
           AND Plug_Present_In_Mold = 1
       ),
       events AS (
         SELECT
-          MoldClose_DateTime,
+          Extract_DateTime,
           CASE
             WHEN Extract_DateTime IS NOT NULL AND Extract_DateTime >= MoldClose_DateTime
               THEN DATEDIFF(minute, MoldClose_DateTime, Extract_DateTime)
@@ -208,15 +205,14 @@ export async function fetchOvenRealtime({ startDate, endDate, bucketMinutes = 5 
         WHERE rn = 1
       )
       SELECT TOP 1
-        MoldClose_DateTime AS LastClose,
-        BakeMinutes AS LastBakeMinutes
+        Extract_DateTime AS LastExtract,
+        BakeMinutes      AS LastBakeMinutes
       FROM events
-      ORDER BY MoldClose_DateTime DESC;
+      ORDER BY Extract_DateTime DESC;
     `);
 
   const rows = Array.isArray(result.recordset) ? result.recordset : [];
   const metaRow = Array.isArray(meta.recordset) ? meta.recordset[0] : null;
-
   return { rows, meta: metaRow ?? null };
 }
 
@@ -229,7 +225,7 @@ export async function fetchOvenFillStats({ startDate, endDate, bucketMinutes = 5
 
   const result = await pool.request()
     .input("start", sql.DateTime2, startDate)
-    .input("end", sql.DateTime2, endDate)
+    .input("end",   sql.DateTime2, endDate)
     .input("bucket", sql.Int, bucket)
     .query(`
       ;WITH base AS (
@@ -237,30 +233,27 @@ export async function fetchOvenFillStats({ startDate, endDate, bucketMinutes = 5
           MoldNumber,
           MoldSize,
           MoldClose_DateTime,
+          Extract_DateTime,
           Plug_Present_In_Mold,
           ROW_NUMBER() OVER (
-            PARTITION BY MoldNumber, MoldClose_DateTime
+            PARTITION BY MoldNumber, Extract_DateTime
             ORDER BY Extract_DateTime DESC
           ) AS rn
         FROM dbo.MoldData
         WHERE
-          MoldClose_DateTime IS NOT NULL
-          AND MoldClose_DateTime >= @start
-          AND MoldClose_DateTime < @end
+          Extract_DateTime IS NOT NULL
+          AND Extract_DateTime >= @start
+          AND Extract_DateTime <  @end
       ),
       events AS (
         SELECT
-          DATEADD(minute, (DATEDIFF(minute, 0, MoldClose_DateTime) / @bucket) * @bucket, 0) AS BucketTime,
+          DATEADD(minute, (DATEDIFF(minute, 0, Extract_DateTime) / @bucket) * @bucket, 0) AS BucketTime,
           MoldSize AS PlugSize,
           CASE WHEN Plug_Present_In_Mold = 1 THEN 1 ELSE 0 END AS IsFilled
         FROM base
         WHERE rn = 1
       )
-      SELECT
-        BucketTime,
-        PlugSize,
-        IsFilled,
-        COUNT(*) AS Cnt
+      SELECT BucketTime, PlugSize, IsFilled, COUNT(*) AS Cnt
       FROM events
       GROUP BY BucketTime, PlugSize, IsFilled
       ORDER BY BucketTime ASC, PlugSize ASC, IsFilled ASC;
@@ -268,3 +261,4 @@ export async function fetchOvenFillStats({ startDate, endDate, bucketMinutes = 5
 
   return Array.isArray(result.recordset) ? result.recordset : [];
 }
+

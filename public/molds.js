@@ -240,19 +240,21 @@ function renderSystemPanel(moldsAll, now, running, unloadedCutoffMin) {
   }
   const latestAgeMin = latestTs ? Math.max(0, Math.round((now - latestTs) / 60000)) : null;
 
+  // Loaded molds = dynamic cutoff when running; fallback to ACTIVE_WINDOW_MIN when idle/off
   const loadedMolds = moldsAll
     .map((m) => ({ m, age: computeAgeMinutes(m, now) }))
     .filter((x) => x.age !== null)
     .filter((x) => {
-      // loaded rule: dynamic cutoff when running; fallback to 180 when idle/off
       if (running && unloadedCutoffMin) return x.age <= unloadedCutoffMin;
       return x.age <= ACTIVE_WINDOW_MIN;
-  })
-  .map((x) => ({ ...x.m, ageMinutes: x.age }));
+    })
+    .map((x) => ({ ...x.m, ageMinutes: x.age }));
 
-  activeTotalEl.textContent = `Active: ${activeMolds.length}`;
+  // Update pills
+  activeTotalEl.textContent = `Loaded: ${loadedMolds.length}`;
   sinceLatestEl.textContent = `Latest Record: ${fmtAgeMinutes(latestAgeMin)}`;
 
+  // Display system state
   systemDotEl.classList.remove("dot-ok", "dot-warn", "dot-off");
   if (!latestTs) {
     systemDotEl.classList.add("dot-off");
@@ -265,18 +267,19 @@ function renderSystemPanel(moldsAll, now, running, unloadedCutoffMin) {
     systemStateEl.innerHTML = `<span class="status-dot dot-warn"></span>Status: Idle/Off`;
   }
 
+  // Subtitle text (optional, but keeps wording accurate)
   const metaEl = document.getElementById("activeMeta");
   if (metaEl) {
     if (running && unloadedCutoffMin) {
-      metaEl.textContent = `Active = record within ${ACTIVE_WINDOW_MIN} min. Mold Unloaded = age > ${unloadedCutoffMin} min (dynamic).`;
+      metaEl.textContent = `Loaded = age ≤ ${unloadedCutoffMin} min (dynamic while running). Fallback: ${ACTIVE_WINDOW_MIN} min when idle/off.`;
     } else {
-      metaEl.textContent = `Active = mold has a record within the last ${ACTIVE_WINDOW_MIN} minutes.`;
+      metaEl.textContent = `Loaded = mold has a record within the last ${ACTIVE_WINDOW_MIN} minutes.`;
     }
   }
 
-  // Active counts by size
+  // Loaded counts by size
   const bySize = new Map();
-  for (const m of activeMolds) {
+  for (const m of loadedMolds) {
     const s = String(m.moldSize ?? "—");
     bySize.set(s, (bySize.get(s) ?? 0) + 1);
   }
@@ -285,15 +288,18 @@ function renderSystemPanel(moldsAll, now, running, unloadedCutoffMin) {
     ? sizes.map((s) => `<tr><td>${s}</td><td>${bySize.get(s)}</td></tr>`).join("")
     : `<tr><td colspan="2">0</td></tr>`;
 
-  // Active mold list sorted size then mold number
-  activeMolds.sort((a, b) => {
+  // Loaded mold list sorted size then mold number
+  loadedMolds.sort((a, b) => {
     const ds = (a.moldSize ?? 0) - (b.moldSize ?? 0);
     if (ds !== 0) return ds;
     return (a.moldNumber ?? 0) - (b.moldNumber ?? 0);
   });
 
-  activeMoldsEl.innerHTML = activeMolds.length
-    ? activeMolds.slice(0, 800).map((m) => `<tr><td>${moldLabel(m)}</td><td>${fmtAgeMinutes(m.ageMinutes)}</td></tr>`).join("")
+  activeMoldsEl.innerHTML = loadedMolds.length
+    ? loadedMolds
+        .slice(0, 800)
+        .map((m) => `<tr><td>${moldLabel(m)}</td><td>${fmtAgeMinutes(m.ageMinutes)}</td></tr>`)
+        .join("")
     : `<tr><td colspan="2">None</td></tr>`;
 }
 

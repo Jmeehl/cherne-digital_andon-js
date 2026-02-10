@@ -1,10 +1,21 @@
 // public/oven.js
 // Oven Shift Performance (Option A: one chart at a time)
-// - Chart View dropdown: Time Series (5-min) | Shift Totals | Shift Instances
-// - Size filter for bar chart views
-// - Downtime shading on time series when total completions == 0 for a bucket
-// - KPI cards (efficiency/time-loss) render with placeholders if offline
+//
+// Views:
+// - Time Series: single-pen (default All sizes, selectable Size 1..4); downtime shading based on total.
+// - Shift Totals: grouped bars by size within each shift (1st/2nd/3rd) + Grand Total.
+// - Shift Instances: grouped bars by size within each shift instance (Day + Shift) + Grand Total.
+//
+// Quick ranges:
+// - Today  : production day (yesterday 21:00 -> today 21:00)
+// - Yesterday: production day (two days ago 21:00 -> yesterday 21:00)
+// - Last Week: 7 production days ending today 21:00
+//
+// This file matches your existing HTML IDs and control layout.
+// (Based on your latest oven.js structure.)
+// ---------------------------------------------------------------------------
 
+/* ---------- DOM ---------- */
 const startEl = document.getElementById("start");
 const endEl = document.getElementById("end");
 const applyBtn = document.getElementById("applyBtn");
@@ -12,10 +23,13 @@ const downloadCsvBtn = document.getElementById("downloadCsvBtn");
 const todayBtn = document.getElementById("todayBtn");
 const shiftBtn = document.getElementById("shiftBtn");
 const last8Btn = document.getElementById("last8Btn");
+const yesterdayBtn = document.getElementById("yesterdayBtn");
+const lastWeekBtn = document.getElementById("lastWeekBtn");
 const liveEl = document.getElementById("live");
 
 const chartViewEl = document.getElementById("chartView");
-const shiftSizeFilterEl = document.getElementById("shiftSizeFilter");
+const shiftSizeFilterEl = document.getElementById("shiftSizeFilter"); // bar-mode filter now disabled
+const tsSizeFilterEl = document.getElementById("tsSizeFilter");        // NEW: time-series size selector
 
 const timeseriesSection = document.getElementById("timeseriesSection");
 const shiftBarsSection = document.getElementById("shiftBarsSection");
@@ -30,15 +44,16 @@ const errorEl = document.getElementById("error");
 const shiftCardsEl = document.getElementById("shiftCards");
 const kpiCardsEl = document.getElementById("kpiCards");
 
+/* ---------- State ---------- */
 let liveTimer = null;
 let lastOvenData = null;
 
+/* ---------- Constants ---------- */
 const COLORS = ["#0066cc", "#cc3300", "#2e7d32", "#6a1b9a", "#ff8f00", "#00838f"];
 const EMPTY_MOLD_SECONDS = 15;
+const SHADE_AFTER_EMPTY_BUCKETS = 1; // 1 empty 5-min bucket => shade
 
-// For shading: shade after 1 empty bucket (5 minutes) per your preference
-const SHADE_AFTER_EMPTY_BUCKETS = 1;
-
+/* ---------- Utils ---------- */
 function pad(n) { return String(n).padStart(2, "0"); }
 function isDark() { return document.documentElement.classList.contains("theme-dark"); }
 
@@ -53,25 +68,27 @@ function showError(msg) {
   errorEl.textContent = msg || "";
 }
 
-// ------------------------
-// Shift logic (local time) with your overlap rules
-// ------------------------
+/* ---------- Shift logic (local) ----------
+   Shift 1: 05:00–13:00
+   Shift 2: 13:00–21:00 
+   Shift 3: 21:00–05:00 (cross-midnight). Adjust if you keep 05:30/21:30.
+------------------------------------------ */
 function minutesSinceMidnight(d) { return d.getHours() * 60 + d.getMinutes(); }
-
 function whichShift(localDate) {
   const mins = minutesSinceMidnight(localDate);
 
-  // Shift 3: 21:00 -> 24:00 and 00:00 -> 05:30
+  // Shift 3: 21:00 → 24:00 OR 00:00 → 05:30
+  // If you decided on 05:00 exact, change s3End to 5*60.
   const s3Start = 21 * 60;
-  const s3End = 5 * 60 + 30;
+  const s3End = 5 * 60;
   if (mins >= s3Start || mins < s3End) return 3;
 
-  // Shift 2: 13:00 -> 21:30
+  // Shift 2: 13:00 → 21:00 (or 21:30 if you confirm)
   const s2Start = 13 * 60;
-  const s2End = 21 * 60 + 30;
+  const s2End = 21 * 60; // or 21*60 + 30;
   if (mins >= s2Start && mins < s2End) return 2;
 
-  // Shift 1: 05:00 -> 13:00 (13:00-13:29 overlap belongs to shift 2)
+  // Shift 1: 05:00 → 13:00
   const s1Start = 5 * 60;
   const s1End = 13 * 60;
   if (mins >= s1Start && mins < s1End) return 1;
@@ -82,42 +99,36 @@ function whichShift(localDate) {
 function currentShiftRange(now = new Date()) {
   const s = whichShift(now);
   const base = new Date(now);
-
   function setTime(d, hh, mm) {
-    const x = new Date(d);
-    x.setHours(hh, mm, 0, 0);
-    return x;
+    const x = new Date(d); x.setHours(hh, mm, 0, 0); return x;
   }
-
-  if (s === 1) return { shift: 1, start: setTime(base, 5, 0), end: setTime(base, 13, 30) };
-  if (s === 2) return { shift: 2, start: setTime(base, 13, 0), end: setTime(base, 21, 30) };
-
-  // shift 3 crosses midnight
+  if (s === 1) return { shift: 1, start: setTime(base, 5, 0),  end: setTime(base, 13, 0) };
+  if (s === 2) return { shift: 2, start: setTime(base, 13, 0), end: setTime(base, 21, 0) };
+  // Shift 3 crosses midnight
   const mins = minutesSinceMidnight(base);
   if (mins >= 21 * 60) {
     const start = setTime(base, 21, 0);
-    const end = new Date(setTime(base, 5, 30).getTime() + 24 * 60 * 60 * 1000);
+    const end = new Date(setTime(base, 5, 0).getTime() + 24 * 60 * 60 * 1000); // if end=05:30
     return { shift: 3, start, end };
   } else {
-    const end = setTime(base, 5, 30);
+    const end = setTime(base, 5, 0);
     const start = new Date(setTime(base, 21, 0).getTime() - 24 * 60 * 60 * 1000);
     return { shift: 3, start, end };
   }
 }
 
-// For shift-instance grouping: compute the start time of the shift occurrence for a given local date.
+// For shift-instance grouping: start time of the shift occurrence for a given local bucket time
 function shiftInstanceStart(localDate) {
   const d = new Date(localDate);
   const sh = whichShift(d);
-
   const start = new Date(d);
   start.setSeconds(0, 0);
 
-  if (sh === 1) { start.setHours(5, 0, 0, 0); return start; }
+  if (sh === 1) { start.setHours(5, 0, 0, 0);  return start; }
   if (sh === 2) { start.setHours(13, 0, 0, 0); return start; }
 
-  // shift 3 starts at 21:00; if before 05:30, start is previous day 21:00
-  const mins = d.getHours() * 60 + d.getMinutes();
+  // shift 3
+  const mins = minutesSinceMidnight(d);
   if (mins >= 21 * 60) {
     start.setHours(21, 0, 0, 0);
     return start;
@@ -128,18 +139,44 @@ function shiftInstanceStart(localDate) {
   }
 }
 
-// ------------------------
-// Fetch
-// ------------------------
-async function fetchData(start, end) {
-  const url = `/api/oven/plug-performance?start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`;
+/* ---------- Production day range (21:00 → next-day 21:00) ---------- */
+function prodDayRangeFor(day /* Date local */) {
+  const end = new Date(day);   end.setHours(21, 0, 0, 0);            // 21:00 local
+  const start = new Date(end); start.setDate(start.getDate() - 1);   // previous day 21:00
+  return { start, end };
+}
+function todayProdDayRange() {
+  const today = new Date(); return prodDayRangeFor(today);
+}
+function yesterdayProdDayRange() {
+  const y = new Date(); y.setDate(y.getDate() - 1); return prodDayRangeFor(y);
+}
+function lastWeekProdDayRange() {
+  const { end } = todayProdDayRange();
+  const start = new Date(end); start.setDate(start.getDate() - 7);
+  return { start, end };
+}
+
+/* ---------- Fetch (LOCAL params) ----------
+   The server's parseRange(req) prefers startLocal/endLocal (YYYY-MM-DDTHH:mm).
+   (Your server.js already implements that path.)
+------------------------------------------------ */
+async function fetchData() {
+  const startLocal = startEl.value;
+  const endLocal = endEl.value;
+
+  if (!startLocal || !endLocal) {
+    throw new Error("Start and End must be selected");
+  }
+
+  const url = `/api/oven/plug-performance?startLocal=${encodeURIComponent(startLocal)}&endLocal=${encodeURIComponent(endLocal)}`;
   const resp = await fetch(url, { cache: "no-store" });
   const data = await resp.json().catch(() => ({}));
   if (!resp.ok || !data.ok) throw new Error(data.error || "Failed to load data");
   return data;
 }
 
-// Normalize the server response for both new (buckets) and old (hours) shapes
+/* ---------- Normalize API shape ---------- */
 function unpackSeries(data) {
   const buckets = Array.isArray(data.buckets) ? data.buckets : (Array.isArray(data.hours) ? data.hours : []);
   const sizes = Array.isArray(data.sizes) ? data.sizes : [];
@@ -147,6 +184,7 @@ function unpackSeries(data) {
   return { buckets, sizes, series };
 }
 
+/* ---------- System Status (from series totals) ---------- */
 function computeSystemStatusFromSeries() {
   if (!lastOvenData) return { status: "—", sinceMin: null };
 
@@ -159,53 +197,22 @@ function computeSystemStatusFromSeries() {
     for (const s of sizes) total += (series[s]?.[i] || 0);
     if (total > 0) lastNonZeroIdx = i;
   }
-
   if (lastNonZeroIdx === -1) return { status: "Idle/Off", sinceMin: null };
 
   const lastTs = new Date(buckets[lastNonZeroIdx]).getTime();
   const sinceMin = Math.max(0, Math.round((Date.now() - lastTs) / 60000));
-
-  // Running if last completion within 10 minutes (2× 5-minute buckets)
   const status = sinceMin <= 10 ? "Running" : "Idle/Off";
   return { status, sinceMin };
 }
 
-// ------------------------
-// KPI rendering (placeholders if offline)
-// ------------------------
+/* ---------- KPIs ---------- */
 function fmtDuration(seconds) {
   const s = Number(seconds || 0);
   if (!Number.isFinite(s) || s <= 0) return "0m";
   const mins = Math.round(s / 60);
   if (mins < 60) return `${mins}m`;
-  const h = Math.floor(mins / 60);
-  const r = mins % 60;
+  const h = Math.floor(mins / 60), r = mins % 60;
   return `${h}h ${r}m`;
-}
-
-function csvEscape(v) {
-  const s = String(v ?? "");
-  // Escape quotes and wrap in quotes if needed
-  if (/[",\n]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
-  return s;
-}
-
-function downloadTextAsFile(filename, text, mime = "text/csv") {
-  const blob = new Blob([text], { type: `${mime};charset=utf-8` });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-function fmtIsoLocalLabel(iso) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function renderKpis(kpis) {
@@ -215,26 +222,20 @@ function renderKpis(kpis) {
   const empty = Number(kpis?.emptyTotal);
   const total = Number(kpis?.totalCycles);
 
-  const eff =
-    (kpis?.efficiencyPct === null || kpis?.efficiencyPct === undefined)
-      ? "—"
-      : `${kpis.efficiencyPct}%`;
+  const eff = (kpis?.efficiencyPct === null || kpis?.efficiencyPct === undefined)
+    ? "—" : `${kpis.efficiencyPct}%`;
 
   const lost = fmtDuration(kpis?.lostSeconds);
 
   const filledDisp = Number.isFinite(filled) ? filled : "—";
-  const emptyDisp = Number.isFinite(empty) ? empty : "—";
-  const totalDisp = Number.isFinite(total) ? total : "—";
+  const emptyDisp  = Number.isFinite(empty)  ? empty  : "—";
+  const totalDisp  = Number.isFinite(total)  ? total  : "—";
 
-  const emptyRate =
-    (Number.isFinite(empty) && Number.isFinite(total) && total > 0)
-      ? `${Math.round((empty / total) * 1000) / 10}%`
-      : "—";
+  const emptyRate = (Number.isFinite(empty) && Number.isFinite(total) && total > 0)
+    ? `${Math.round((empty / total) * 1000) / 10}%` : "—";
 
   const sys = computeSystemStatusFromSeries();
-  const sysText = (sys.sinceMin === null)
-    ? sys.status
-    : `${sys.status} (last ${sys.sinceMin}m)`;
+  const sysText = (sys.sinceMin === null) ? sys.status : `${sys.status} (last ${sys.sinceMin}m)`;
 
   kpiCardsEl.innerHTML = `
     <div class="card">
@@ -272,9 +273,7 @@ function renderKpis(kpis) {
   `;
 }
 
-// ------------------------
-// Shift cards (keep for quick glance; shown only in time series view)
-// ------------------------
+/* ---------- Shift cards (for quick glance; time-series only) ---------- */
 function renderShiftCards(buckets, sizes, series) {
   const totals = { 1: {}, 2: {}, 3: {} };
   for (const sh of [1, 2, 3]) for (const s of sizes) totals[sh][s] = 0;
@@ -289,37 +288,51 @@ function renderShiftCards(buckets, sizes, series) {
   [1, 2, 3].forEach((sh) => {
     const card = document.createElement("div");
     card.className = "card";
-
     const h3 = document.createElement("h3");
     h3.textContent = `${sh} ${sh === 1 ? "st" : sh === 2 ? "nd" : "rd"} Shift Total`;
-
     const p = document.createElement("div");
     p.className = "muted";
     const lines = sizes.map((s) => `Size ${s}: ${totals[sh][s]}`);
     p.textContent = lines.join("  |  ");
-
     card.appendChild(h3);
     card.appendChild(p);
     shiftCardsEl.appendChild(card);
   });
 }
 
-// ------------------------
-// Legends
-// ------------------------
-function buildTimeSeriesLegend(sizes) {
-  legendEl.innerHTML = "";
+/* ---------- Single-pen Time Series helpers ---------- */
+function ensureTsSizeOptions(sizes) {
+  if (!tsSizeFilterEl) return;
+  const current = tsSizeFilterEl.value || "ALL";
+  tsSizeFilterEl.innerHTML = `<option value="ALL">All sizes</option>` +
+    sizes.map(s => `<option value="${String(s)}">Size ${s}</option>`).join("");
+  if ([...tsSizeFilterEl.options].some(o => o.value === current)) {
+    tsSizeFilterEl.value = current;
+  }
+}
 
-  sizes.forEach((s, i) => {
-    const item = document.createElement("div");
-    item.className = "item";
-    const sw = document.createElement("span");
-    sw.className = "swatch";
-    sw.style.background = COLORS[i % COLORS.length];
-    item.appendChild(sw);
-    item.appendChild(document.createTextNode(`Size ${s}`));
-    legendEl.appendChild(item);
-  });
+function getTsLine(buckets, sizes, series, sel) {
+  if (sel === "ALL") {
+    const line = buckets.map((_, i) =>
+      sizes.reduce((t, s) => t + (series[s]?.[i] || 0), 0)
+    );
+    return { line, label: "All sizes" };
+  }
+  const data = series[sel] || [];
+  const line = buckets.map((_, i) => Number(data[i] || 0));
+  return { line, label: `Size ${sel}` };
+}
+
+function buildTimeSeriesLegendSingle(label) {
+  legendEl.innerHTML = "";
+  const item = document.createElement("div");
+  item.className = "item";
+  const sw = document.createElement("span");
+  sw.className = "swatch";
+  sw.style.background = COLORS[0];
+  item.appendChild(sw);
+  item.appendChild(document.createTextNode(label));
+  legendEl.appendChild(item);
 
   const dt = document.createElement("div");
   dt.className = "item";
@@ -331,9 +344,6 @@ function buildTimeSeriesLegend(sizes) {
   legendEl.appendChild(dt);
 }
 
-// ------------------------
-// Time series chart with downtime shading
-// ------------------------
 function computeStoppedMask(sizes, series, N) {
   const mask = new Array(N).fill(false);
   for (let i = 0; i < N; i++) {
@@ -346,19 +356,14 @@ function computeStoppedMask(sizes, series, N) {
 
 function shadeStopped(ctx, mask, padL, padT, plotW, plotH, N) {
   if (N < 2) return;
-
   const stepPx = plotW / (N - 1);
   const xFor = (i) => padL + plotW * (i / (N - 1));
-
   ctx.save();
   ctx.fillStyle = isDark() ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.07)";
-
   let i = 0;
   while (i < N) {
     if (!mask[i]) { i++; continue; }
-    let j = i;
-    while (j + 1 < N && mask[j + 1]) j++;
-
+    let j = i; while (j + 1 < N && mask[j + 1]) j++;
     const runLen = (j - i + 1);
     if (runLen >= SHADE_AFTER_EMPTY_BUCKETS) {
       const x0 = Math.max(padL, xFor(i) - stepPx / 2);
@@ -370,19 +375,18 @@ function shadeStopped(ctx, mask, padL, padT, plotW, plotH, N) {
   ctx.restore();
 }
 
-function drawTimeSeries(buckets, sizes, series) {
-  const ctx = canvas.getContext("2d");
-  const W = canvas.width;
-  const H = canvas.height;
+function drawTimeSeriesSingle(buckets, sizes, series, sel) {
+  const { line, label } = getTsLine(buckets, sizes, series, sel);
 
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
   const padL = 60, padR = 20, padT = 18, padB = 44;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
-
   const N = buckets.length;
 
   let maxY = 0;
-  for (const s of sizes) for (const v of (series[s] || [])) maxY = Math.max(maxY, v);
+  for (const v of line) maxY = Math.max(maxY, v);
   maxY = Math.max(5, Math.ceil(maxY * 1.15));
 
   ctx.clearRect(0, 0, W, H);
@@ -392,6 +396,7 @@ function drawTimeSeries(buckets, sizes, series) {
   const stoppedMask = computeStoppedMask(sizes, series, N);
   shadeStopped(ctx, stoppedMask, padL, padT, plotW, plotH, N);
 
+  // Grid
   ctx.strokeStyle = isDark() ? "rgba(255,255,255,0.10)" : "#e6e6e6";
   ctx.lineWidth = 1;
   const gridLines = 5;
@@ -403,6 +408,7 @@ function drawTimeSeries(buckets, sizes, series) {
     ctx.stroke();
   }
 
+  // Y labels
   ctx.fillStyle = isDark() ? "#e6e8ea" : "#333";
   ctx.font = "12px sans-serif";
   ctx.textAlign = "right";
@@ -413,17 +419,18 @@ function drawTimeSeries(buckets, sizes, series) {
     ctx.fillText(String(val), padL - 8, y);
   }
 
-  // x labels (HH:mm) ~12 labels max
+  // X labels (HH:mm)
   const step = Math.max(1, Math.floor(N / 12));
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
   for (let i = 0; i < N; i += step) {
     const x = padL + (plotW * (N === 1 ? 0 : i / (N - 1)));
     const d = new Date(buckets[i]);
-    const label = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    ctx.fillText(label, x, padT + plotH + 10);
+    const labelX = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    ctx.fillText(labelX, x, padT + plotH + 10);
   }
 
+  // Axes
   ctx.strokeStyle = isDark() ? "rgba(255,255,255,0.35)" : "#333";
   ctx.lineWidth = 1.5;
   ctx.beginPath();
@@ -432,204 +439,209 @@ function drawTimeSeries(buckets, sizes, series) {
   ctx.lineTo(padL + plotW, padT + plotH);
   ctx.stroke();
 
-  sizes.forEach((s, si) => {
-    const data = series[s] || [];
-    ctx.strokeStyle = COLORS[si % COLORS.length];
-    ctx.lineWidth = 3;
-    ctx.beginPath();
+  // Single line
+  ctx.strokeStyle = COLORS[0];
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (let i = 0; i < N; i++) {
+    const x = padL + (plotW * (N === 1 ? 0 : i / (N - 1)));
+    const y = padT + plotH - (plotH * (line[i] / maxY));
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
 
-    data.forEach((v, i) => {
-      const x = padL + (plotW * (N === 1 ? 0 : i / (N - 1)));
-      const y = padT + plotH - (plotH * (v / maxY));
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
-
-    ctx.stroke();
-  });
+  buildTimeSeriesLegendSingle(label);
 }
 
-// ------------------------
-// Bar chart helpers
-// ------------------------
-function computeTotalsByShiftType(buckets, sizes, series, sizeFilter) {
-  const totals = { 1: 0, 2: 0, 3: 0 };
-  const useAll = !sizeFilter || sizeFilter === "ALL";
+/* ---------- Grouped bars (Shift Totals / Shift Instances) ---------- */
+function buildBarLegendSizes(sizeOrder) {
+  if (!shiftLegendEl) return;
+
+  const legend = document.createElement("div");
+  legend.className = "legend";
+  legend.style.marginTop = "8px";
+  legend.style.display = "flex";
+  legend.style.flexWrap = "wrap";
+  legend.style.gap = "14px";
+
+  sizeOrder.forEach((s, i) => {
+    const item = document.createElement("div");
+    item.className = "item";
+    item.style.display = "flex";
+    item.style.alignItems = "center";
+    item.style.gap = "8px";
+    const sw = document.createElement("span");
+    sw.className = "swatch";
+    sw.style.width = "14px";
+    sw.style.height = "14px";
+    sw.style.borderRadius = "3px";
+    sw.style.background = COLORS[i % COLORS.length];
+    item.appendChild(sw);
+    item.appendChild(document.createTextNode(`Size ${s}`));
+    legend.appendChild(item);
+  });
+
+  shiftLegendEl.innerHTML = "";
+  shiftLegendEl.appendChild(legend);
+}
+
+function computeTotalsByShiftTypeGrouped(buckets, sizes, series) {
+  const sizeOrder = [...sizes].sort((a, b) => Number(a) - Number(b));
+  const bySize = new Map(sizeOrder.map(s => [s, [0, 0, 0]])); // [shift1, shift2, shift3]
 
   for (let i = 0; i < buckets.length; i++) {
     const d = new Date(buckets[i]);
     const sh = whichShift(d);
-
-    let count = 0;
-    if (useAll) {
-      for (const s of sizes) count += (series[s]?.[i] || 0);
-    } else {
-      count = (series[sizeFilter]?.[i] || 0);
+    const idx = sh - 1;
+    for (const s of sizeOrder) {
+      const v = Number(series[s]?.[i] || 0);
+      bySize.get(s)[idx] += v;
     }
-    totals[sh] += count;
   }
 
-  return {
-    labels: ["1st Shift", "2nd Shift", "3rd Shift"],
-    values: [totals[1], totals[2], totals[3]]
-  };
+  const labels = ["1st Shift", "2nd Shift", "3rd Shift"];
+  const seriesMap = Object.fromEntries(sizeOrder.map(s => [s, bySize.get(s)]));
+  const totals = labels.map((_, col) =>
+    sizeOrder.reduce((sum, s) => sum + (seriesMap[s][col] || 0), 0)
+  );
+
+  return { labels, sizeOrder, seriesMap, totals };
 }
 
-function computeTotalsByShiftInstance(buckets, sizes, series, sizeFilter) {
-  const useAll = !sizeFilter || sizeFilter === "ALL";
-  const map = new Map();     // key -> total
+function computeTotalsByShiftInstanceGrouped(buckets, sizes, series) {
+  const sizeOrder = [...sizes].sort((a, b) => Number(a) - Number(b));
+
   const keyMeta = new Map(); // key -> { start, sh }
+  const keysSet = new Set();
 
   for (let i = 0; i < buckets.length; i++) {
     const d = new Date(buckets[i]);
     const sh = whichShift(d);
     const start = shiftInstanceStart(d);
-
     const key = `${start.toISOString()}|${sh}`;
-    keyMeta.set(key, { start, sh });
-
-    let count = 0;
-    if (useAll) {
-      for (const s of sizes) count += (series[s]?.[i] || 0);
-    } else {
-      count = (series[sizeFilter]?.[i] || 0);
+    if (!keysSet.has(key)) {
+      keysSet.add(key);
+      keyMeta.set(key, { start, sh });
     }
-
-    map.set(key, (map.get(key) ?? 0) + count);
   }
 
-  const keys = Array.from(map.keys()).sort((a, b) => {
-    const sa = keyMeta.get(a)?.start?.getTime() ?? 0;
-    const sb = keyMeta.get(b)?.start?.getTime() ?? 0;
-    return sa - sb;
-  });
+  const keys = Array.from(keysSet).sort((a, b) =>
+    (keyMeta.get(a)?.start?.getTime() ?? 0) - (keyMeta.get(b)?.start?.getTime() ?? 0)
+  );
 
-  const labels = keys.map((k) => {
-    const meta = keyMeta.get(k);
-    const start = meta.start;
-    const sh = meta.sh;
-    const day = `${start.getMonth() + 1}/${start.getDate()}`;
+  const seriesMap = Object.fromEntries(sizeOrder.map(s => [s, new Array(keys.length).fill(0)]));
+  const keyIndex = new Map(keys.map((k, i) => [k, i]));
+
+  for (let i = 0; i < buckets.length; i++) {
+    const d = new Date(buckets[i]);
+    const sh = whichShift(d);
+    const start = shiftInstanceStart(d);
+    const key = `${start.toISOString()}|${sh}`;
+    const k = keyIndex.get(key);
+    if (k === undefined) continue;
+
+    for (const s of sizeOrder) {
+      const v = Number(series[s]?.[i] || 0);
+      seriesMap[s][k] += v;
+    }
+  }
+
+  const labels = keys.map(k => {
+    const { start, sh } = keyMeta.get(k);
+    const day = `${start.getMonth()+1}/${start.getDate()}`;
     const shName = sh === 1 ? "1st" : sh === 2 ? "2nd" : "3rd";
     return `${day} ${shName}`;
   });
 
-  const values = keys.map((k) => map.get(k) ?? 0);
-  return { labels, values };
+  const totals = labels.map((_, col) =>
+    sizeOrder.reduce((sum, s) => sum + (seriesMap[s][col] || 0), 0)
+  );
+
+  return { labels, sizeOrder, seriesMap, totals };
 }
 
-function buildOvenCsv() {
-  if (!lastOvenData) {
-    // Still export a tiny file so users know it worked
-    return [
-      "Note,No data loaded yet. Try Apply/Refresh while on network."
-    ].join("\n");
+/* Render a simple Grand Total box under the grouped bar legend */
+function renderGrandTotalBox(grandTotal) {
+  if (!shiftLegendEl) return;
+  // Create/replace a small total box
+  let box = document.getElementById("barGrandTotal");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "barGrandTotal";
+    box.style.marginTop = "8px";
+    box.style.fontWeight = "900";
+    box.style.padding = "8px 10px";
+    box.style.border = "1px solid #ddd";
+    box.style.borderRadius = "8px";
+    box.style.display = "inline-block";
+    box.style.background = isDark() ? "#12171d" : "#ffffff";
+    shiftLegendEl.appendChild(box);
   }
-
-  const mode = chartViewEl?.value || "timeseries";
-  const sizeFilter = shiftSizeFilterEl?.value || "ALL";
-
-  const { buckets, sizes, series } = unpackSeries(lastOvenData);
-  const k = lastOvenData.kpis || null;
-
-  const lines = [];
-  lines.push(["GeneratedAt", new Date().toISOString()].map(csvEscape).join(","));
-  lines.push(["RangeStart", lastOvenData.start ?? ""].map(csvEscape).join(","));
-  lines.push(["RangeEnd", lastOvenData.end ?? ""].map(csvEscape).join(","));
-  lines.push(["ChartView", mode].map(csvEscape).join(","));
-  lines.push(["ShiftSizeFilter", sizeFilter].map(csvEscape).join(","));
-  lines.push("");
-
-  // KPIs section
-  lines.push("KPIs");
-  lines.push(["FilledTotal", k?.filledTotal ?? ""].map(csvEscape).join(","));
-  lines.push(["EmptyTotal", k?.emptyTotal ?? ""].map(csvEscape).join(","));
-  lines.push(["TotalCycles", k?.totalCycles ?? ""].map(csvEscape).join(","));
-  lines.push(["EfficiencyPct", k?.efficiencyPct ?? ""].map(csvEscape).join(","));
-  lines.push(["LostSeconds", k?.lostSeconds ?? ""].map(csvEscape).join(","));
-  lines.push("");
-
-  // Always include shift summaries (useful for schedulers/managers)
-  // By shift type
-  lines.push("ShiftTotals_ByType");
-  const typeRes = computeTotalsByShiftType(buckets, sizes, series, sizeFilter);
-  lines.push(["Shift", "TotalCompleted"].map(csvEscape).join(","));
-  for (let i = 0; i < typeRes.labels.length; i++) {
-    lines.push([typeRes.labels[i], typeRes.values[i]].map(csvEscape).join(","));
-  }
-  lines.push("");
-
-  // By shift instance
-  lines.push("ShiftTotals_ByInstance");
-  const instRes = computeTotalsByShiftInstance(buckets, sizes, series, sizeFilter);
-  lines.push(["ShiftInstance", "TotalCompleted"].map(csvEscape).join(","));
-  for (let i = 0; i < instRes.labels.length; i++) {
-    lines.push([instRes.labels[i], instRes.values[i]].map(csvEscape).join(","));
-  }
-  lines.push("");
-
-  // If time series view, include bucket-level data too
-  if (mode === "timeseries") {
-    lines.push("TimeSeries_Buckets");
-    const header = ["BucketLocal", ...sizes.map(s => `Size_${s}`), "Total"];
-    lines.push(header.map(csvEscape).join(","));
-
-    for (let i = 0; i < buckets.length; i++) {
-      let total = 0;
-      const row = [fmtIsoLocalLabel(buckets[i])];
-      for (const s of sizes) {
-        const v = Number(series[s]?.[i] || 0);
-        total += v;
-        row.push(v);
-      }
-      row.push(total);
-      lines.push(row.map(csvEscape).join(","));
-    }
-    lines.push("");
-  }
-
-  return lines.join("\n");
+  box.textContent = `Grand Total: ${grandTotal}`;
 }
 
-function drawBarChart(labels, values, hintText) {
+function drawGroupedBars(labels, seriesMap, sizeOrder, hintText) {
   if (!shiftBarCanvas) return;
   const ctx = shiftBarCanvas.getContext("2d");
+  const W = shiftBarCanvas.width, H = shiftBarCanvas.height;
 
-  const W = shiftBarCanvas.width;
-  const H = shiftBarCanvas.height;
-
-  const padL = 60, padR = 20, padT = 18, padB = 70;
+  // More bottom padding to fit x-label + group-total box
+  const padL = 60, padR = 20, padT = 18, padB = 96;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
 
-  const N = labels.length;
-  const maxV = Math.max(...values, 5);
-  const maxY = Math.ceil(maxV * 1.15);
+  const N = labels.length;         // Number of shift groups
+  const S = sizeOrder.length;      // Number of bars per group (sizes)
 
+  // ---- Compute per-group totals + grand total (used for boxes & sidebar)
+  const totals = labels.map((_, i) =>
+    sizeOrder.reduce((sum, s) => sum + (seriesMap[s]?.[i] || 0), 0)
+  );
+  const grandTotal = totals.reduce((a, b) => a + b, 0);
+
+  // ----------------------------------------------------------
+  // Y‑axis scaling — based ONLY on the highest single bar
+  // ----------------------------------------------------------
+  const highestSingleBar = Math.max(
+    5, // minimum height so small datasets still look okay
+    ...sizeOrder.map(s => Math.max(...(seriesMap[s] || [0])))
+  );
+
+  const HEADROOM = 1.05;   // 5% headroom (looks good)
+  const MIN_Y    = 100;    // minimum axis height (tune or set to 0 to disable)
+  const maxY = Math.max(MIN_Y, Math.ceil(highestSingleBar * HEADROOM));
+
+  // ---- Background
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = isDark() ? "#0f1419" : "#ffffff";
   ctx.fillRect(0, 0, W, H);
 
+  // ---- Grid lines
   ctx.strokeStyle = isDark() ? "rgba(255,255,255,0.10)" : "#e6e6e6";
   ctx.lineWidth = 1;
   const gridLines = 5;
+
   for (let i = 0; i <= gridLines; i++) {
-    const y = padT + (plotH * i / gridLines);
+    const y = Math.round(padT + (plotH * i / gridLines));
     ctx.beginPath();
     ctx.moveTo(padL, y);
     ctx.lineTo(padL + plotW, y);
     ctx.stroke();
   }
 
+  // ---- Y-axis labels
   ctx.fillStyle = isDark() ? "#e6e8ea" : "#333";
   ctx.font = "12px sans-serif";
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
+
   for (let i = 0; i <= gridLines; i++) {
     const val = Math.round(maxY * (1 - i / gridLines));
-    const y = padT + (plotH * i / gridLines);
+    const y = Math.round(padT + (plotH * i / gridLines));
     ctx.fillText(String(val), padL - 8, y);
   }
 
+  // ---- Axis lines
   ctx.strokeStyle = isDark() ? "rgba(255,255,255,0.35)" : "#333";
   ctx.lineWidth = 1.5;
   ctx.beginPath();
@@ -639,115 +651,343 @@ function drawBarChart(labels, values, hintText) {
   ctx.stroke();
 
   if (N === 0) {
-    if (shiftLegendEl) shiftLegendEl.textContent = "No data in selected range.";
+    shiftLegendEl.textContent = "No data in selected range.";
     return;
   }
 
-  const gap = Math.max(6, Math.min(16, Math.floor(plotW / (N * 6))));
-  const barW = Math.max(8, (plotW - gap * (N + 1)) / N);
+  // ----------------------------------------------------------
+  // Group + bar geometry
+  // ----------------------------------------------------------
+  const groupGap = Math.max(16, Math.min(40, Math.floor(plotW / Math.max(6, N * 6))));
+  const groupW   = (plotW - groupGap * (N + 1)) / N;
 
-  const barColor = "#1565c0";
+  const barGap   = Math.max(6, Math.min(14, Math.floor(groupW / Math.max(6, S * 6))));
+  let barW       = (groupW - barGap * (S - 1)) / S;
+
+  if (barW < 3) {
+    const spare = Math.min(barGap - 2, 6);
+    const newGap = Math.max(2, barGap - spare);
+    barW = (groupW - newGap * (S - 1)) / S;
+  }
+  barW = Math.max(4, Math.floor(barW));
+
+  const textColor = isDark() ? "#e6e8ea" : "#333";
+
+  // ----------------------------------------------------------
+  // Render bars + labels + group totals
+  // ----------------------------------------------------------
   for (let i = 0; i < N; i++) {
-    const x0 = padL + gap + i * (barW + gap);
-    const h = plotH * (values[i] / maxY);
-    const y0 = padT + plotH - h;
+    const xGroup = Math.round(padL + groupGap + i * (groupW + groupGap));
 
-    ctx.fillStyle = barColor;
-    ctx.fillRect(x0, y0, barW, h);
+    // ---- Bars per size inside group
+    sizeOrder.forEach((s, si) => {
+      const v = Number(seriesMap[s]?.[i] || 0);
+      const h = Math.round(plotH * (v / maxY));
+      const y0 = Math.round(padT + plotH - h);
+      const x0 = Math.round(xGroup + si * (barW + barGap));
 
-    ctx.fillStyle = isDark() ? "#e6e8ea" : "#333";
+      // Draw bar
+      const barColor = COLORS[si % COLORS.length];
+      ctx.fillStyle = barColor;
+
+      const safeBarW = Math.max(1, Math.min(barW, padL + plotW - x0));
+      ctx.fillRect(x0, y0, safeBarW, h);
+
+      // ---- Value label ON the bar
+      const label = String(v);
+      ctx.font = "12px sans-serif";
+      ctx.textAlign = "center";
+
+      if (h >= 18) {
+        // Inside bar
+        ctx.fillStyle = "#ffffff";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, Math.round(x0 + safeBarW / 2), Math.round(y0 + h / 2));
+      } else {
+        // Just above bar
+        ctx.fillStyle = textColor;
+        ctx.textBaseline = "bottom";
+        ctx.fillText(label, Math.round(x0 + safeBarW / 2), Math.round(y0 - 2));
+      }
+    });
+
+    // ---- X-axis label
+    const xLabel = Math.round(xGroup + groupW / 2);
+    const yLabel = Math.round(padT + plotH + 12);
+
+    ctx.fillStyle = textColor;
     ctx.textAlign = "center";
-    ctx.textBaseline = "bottom";
+    ctx.textBaseline = "top";
     ctx.font = "12px sans-serif";
-    ctx.fillText(String(values[i]), x0 + barW / 2, y0 - 4);
+    ctx.fillText(labels[i], xLabel, yLabel);
+
+    // ---- Per-group total BOX (under the label)
+    const tot = totals[i];
+    const boxText = String(tot);
+    const paddingX = 8, paddingY = 4;
+    const textW = ctx.measureText(boxText).width;
+
+    const boxW = Math.ceil(textW + paddingX * 2);
+    const boxH = 22;
+    const boxX = Math.round(xLabel - boxW / 2);
+    const boxY = Math.round(yLabel + 14);
+
+    // Box background
+    ctx.fillStyle = isDark() ? "#12171d" : "#ffffff";
+    ctx.strokeStyle = isDark() ? "#2a3139" : "#ddd";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.rect(boxX, boxY, boxW, boxH);
+    ctx.fill();
+    ctx.stroke();
+
+    // Box text
+    ctx.fillStyle = textColor;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(boxText, Math.round(boxX + boxW / 2), Math.round(boxY + boxH / 2));
   }
 
-  // X labels (rotate if many)
-  ctx.save();
-  ctx.fillStyle = isDark() ? "#e6e8ea" : "#333";
-  ctx.font = "12px sans-serif";
-  const rotate = N > 6;
+  // ----------------------------------------------------------
+  // Legend + right-side ALL SHIFTS panel
+  // ----------------------------------------------------------
+  shiftLegendEl.innerHTML = "";
+  const wrap = document.createElement("div");
+  wrap.style.display = "flex";
+  wrap.style.justifyContent = "space-between";
+  wrap.style.alignItems = "flex-start";
+  wrap.style.gap = "16px";
+  wrap.style.flexWrap = "wrap";
 
-  for (let i = 0; i < N; i++) {
-    const x = padL + gap + i * (barW + gap) + barW / 2;
-    const y = padT + plotH + 10;
+  // ---------- LEFT: hint + size legend ----------
+  const left = document.createElement("div");
+  left.style.display = "flex";
+  left.style.flexDirection = "column";
+  left.style.gap = "8px";
 
-    if (rotate) {
-      ctx.translate(x, y);
-      ctx.rotate(-Math.PI / 4);
-      ctx.textAlign = "center";
-      ctx.textBaseline = "top";
-      ctx.fillText(labels[i], 0, 0);
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-    } else {
-      ctx.textAlign = "center";
-      ctx.textBaseline = "top";
-      ctx.fillText(labels[i], x, y);
-    }
-  }
-  ctx.restore();
+  const hint = document.createElement("div");
+  hint.textContent = hintText || "";
+  hint.style.fontWeight = "700";
+  left.appendChild(hint);
 
-  if (shiftLegendEl) shiftLegendEl.textContent = hintText || "";
+  const legend = document.createElement("div");
+  legend.className = "legend";
+  legend.style.display = "flex";
+  legend.style.flexWrap = "wrap";
+  legend.style.gap = "14px";
+
+  sizeOrder.forEach((s, i) => {
+    const item = document.createElement("div");
+    item.style.display = "flex";
+    item.style.alignItems = "center";
+    item.style.gap = "8px";
+
+    const sw = document.createElement("span");
+    sw.className = "swatch";
+    sw.style.width = "14px";
+    sw.style.height = "14px";
+    sw.style.borderRadius = "3px";
+    sw.style.background = COLORS[i % COLORS.length];
+
+    item.appendChild(sw);
+    item.appendChild(document.createTextNode(`Size ${s}`));
+    legend.appendChild(item);
+  });
+
+  left.appendChild(legend);
+
+  // ---------- RIGHT: ALL SHIFTS panel ----------
+  const right = document.createElement("div");
+  right.style.minWidth = "220px";
+  right.style.border = "1px solid " + (isDark() ? "#2a3139" : "#ddd");
+  right.style.borderRadius = "10px";
+  right.style.padding = "10px 12px";
+  right.style.background = isDark() ? "#12171d" : "#ffffff";
+  right.style.fontWeight = "900";
+
+  const title = document.createElement("div");
+  title.textContent = "ALL Shifts";
+  title.style.marginBottom = "6px";
+
+  const ul = document.createElement("div");
+  ul.style.display = "grid";
+  ul.style.gridTemplateColumns = "1fr auto";
+  ul.style.gap = "4px 10px";
+
+  // per-size sums across all groups
+  sizeOrder.forEach((s, i) => {
+    const sum = (seriesMap[s] || []).reduce((a, b) => a + (b || 0), 0);
+    const name = document.createElement("div");
+    name.textContent = `Size ${s}:`;
+
+    const val = document.createElement("div");
+    val.textContent = String(sum);
+    val.style.textAlign = "right";
+    val.style.color = COLORS[i % COLORS.length];
+
+    ul.appendChild(name);
+    ul.appendChild(val);
+  });
+
+  const hr = document.createElement("div");
+  hr.style.height = "1px";
+  hr.style.background = isDark() ? "#2a3139" : "#ddd";
+  hr.style.margin = "8px 0";
+
+  const totalRow = document.createElement("div");
+  totalRow.style.display = "grid";
+  totalRow.style.gridTemplateColumns = "1fr auto";
+  totalRow.style.gap = "4px 10px";
+
+  const totalLabel = document.createElement("div");
+  totalLabel.textContent = "Total Balls";
+
+  const totalVal = document.createElement("div");
+  totalVal.textContent = String(grandTotal);
+  totalVal.style.textAlign = "right";
+
+  right.appendChild(title);
+  right.appendChild(ul);
+  right.appendChild(hr);
+  right.appendChild(totalLabel);
+  right.appendChild(totalVal);
+
+  // Combine left + right into final legend pane
+  wrap.appendChild(left);
+  wrap.appendChild(right);
+  shiftLegendEl.appendChild(wrap);
 }
 
-// ------------------------
-// View controller
-// ------------------------
+
+/* ---------- CSV ---------- */
+function csvEscape(v) {
+  const s = String(v ?? "");
+  return (/[",\n]/.test(s)) ? `"${s.replaceAll('"', '""')}"` : s;
+}
+function downloadTextAsFile(filename, text, mime = "text/csv") {
+  const blob = new Blob([text], { type: `${mime};charset=utf-8` });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+function fmtIsoLocalLabel(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function buildOvenCsv() {
+  if (!lastOvenData) return "Note,No data loaded yet. Try Apply/Refresh while on network.\n";
+
+  const mode = chartViewEl?.value || "timeseries";
+  const { buckets, sizes, series } = unpackSeries(lastOvenData);
+  const k = lastOvenData.kpis || null;
+
+  const lines = [];
+  lines.push(["GeneratedAt", new Date().toISOString()].map(csvEscape).join(","));
+  lines.push(["RangeStart", lastOvenData.start ?? ""].map(csvEscape).join(","));
+  lines.push(["RangeEnd",   lastOvenData.end   ?? ""].map(csvEscape).join(","));
+  lines.push(["ChartView", mode].map(csvEscape).join(","));
+  lines.push("");
+
+  lines.push("KPIs");
+  lines.push(["FilledTotal", k?.filledTotal ?? ""].map(csvEscape).join(","));
+  lines.push(["EmptyTotal",  k?.emptyTotal  ?? ""].map(csvEscape).join(","));
+  lines.push(["TotalCycles", k?.totalCycles ?? ""].map(csvEscape).join(","));
+  lines.push(["EfficiencyPct", k?.efficiencyPct ?? ""].map(csvEscape).join(","));
+  lines.push(["LostSeconds", k?.lostSeconds ?? ""].map(csvEscape).join(","));
+  lines.push("");
+
+  if (mode === "timeseries") {
+    lines.push("TimeSeries_Buckets");
+    const header = ["BucketLocal", ...sizes.map((s) => `Size_${s}`), "Total"];
+    lines.push(header.map(csvEscape).join(","));
+
+    for (let i = 0; i < buckets.length; i++) {
+      let total = 0;
+      const row = [fmtIsoLocalLabel(buckets[i])];
+      for (const s of sizes) {
+        const v = Number(series[s]?.[i] || 0);
+        total += v; row.push(v);
+      }
+      row.push(total);
+      lines.push(row.map(csvEscape).join(","));
+    }
+    lines.push("");
+  } else if (mode === "shiftType") {
+    const g = computeTotalsByShiftTypeGrouped(buckets, sizes, series);
+    lines.push("ShiftTotals_ByType_Grouped");
+    lines.push(["Shift", ...g.sizeOrder.map(s => `Size_${s}`), "Total"].map(csvEscape).join(","));
+    for (let i = 0; i < g.labels.length; i++) {
+      const row = [g.labels[i], ...g.sizeOrder.map(s => g.seriesMap[s][i]),
+        g.sizeOrder.reduce((t,s)=> t + (g.seriesMap[s][i] || 0), 0)];
+      lines.push(row.map(csvEscape).join(","));
+    }
+    lines.push("");
+  } else {
+    const g = computeTotalsByShiftInstanceGrouped(buckets, sizes, series);
+    lines.push("ShiftTotals_ByInstance_Grouped");
+    lines.push(["ShiftInstance", ...g.sizeOrder.map(s => `Size_${s}`), "Total"].map(csvEscape).join(","));
+    for (let i = 0; i < g.labels.length; i++) {
+      const row = [g.labels[i], ...g.sizeOrder.map(s => g.seriesMap[s][i]),
+        g.sizeOrder.reduce((t,s)=> t + (g.seriesMap[s][i] || 0), 0)];
+      lines.push(row.map(csvEscape).join(","));
+    }
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
+/* ---------- View controller ---------- */
 function setChartMode(mode) {
   const isTime = mode === "timeseries";
   timeseriesSection.style.display = isTime ? "block" : "none";
-  shiftBarsSection.style.display = isTime ? "none" : "block";
+  shiftBarsSection.style.display  = isTime ? "none"  : "block";
+  shiftCardsEl.style.display      = isTime ? "flex"  : "none";
 
-  // show shiftCards only for time series (bar chart already represents shift performance)
-  shiftCardsEl.style.display = isTime ? "flex" : "none";
+  // Bar modes always include all sizes now, so bar-size filter is disabled.
+  if (shiftSizeFilterEl) shiftSizeFilterEl.disabled = true;
 
-  // Size filter only relevant for bar modes
-  shiftSizeFilterEl.disabled = isTime;
+  // Show TS size filter only for time series
+  if (tsSizeFilterEl && tsSizeFilterEl.parentElement) {
+    tsSizeFilterEl.parentElement.style.display = isTime ? "block" : "none";
+  }
 }
 
 function renderCurrentView() {
   if (!lastOvenData) return;
 
   const { buckets, sizes, series } = unpackSeries(lastOvenData);
-  const mode = chartViewEl.value || "timeseries";
-  const sizeFilter = shiftSizeFilterEl.value || "ALL";
+  const mode = chartViewEl?.value || "timeseries";
 
   if (mode === "timeseries") {
-    buildTimeSeriesLegend(sizes);
+    ensureTsSizeOptions(sizes);
+    const sel = tsSizeFilterEl?.value || "ALL";
+    drawTimeSeriesSingle(buckets, sizes, series, sel);
     renderShiftCards(buckets, sizes, series);
-    drawTimeSeries(buckets, sizes, series);
   } else if (mode === "shiftType") {
-    const res = computeTotalsByShiftType(buckets, sizes, series, sizeFilter);
-    const hint = `Shift totals (${sizeFilter === "ALL" ? "All sizes" : "Size " + sizeFilter})`;
-    drawBarChart(res.labels, res.values, hint);
+    const g = computeTotalsByShiftTypeGrouped(buckets, sizes, series);
+    const hint = "Shift totals by size";
+    drawGroupedBars(g.labels, g.seriesMap, g.sizeOrder, hint);
   } else {
-    const res = computeTotalsByShiftInstance(buckets, sizes, series, sizeFilter);
-    const hint = `Shift instances (${sizeFilter === "ALL" ? "All sizes" : "Size " + sizeFilter})`;
-    drawBarChart(res.labels, res.values, hint);
+    const g = computeTotalsByShiftInstanceGrouped(buckets, sizes, series);
+    const hint = "Shift instances by size";
+    drawGroupedBars(g.labels, g.seriesMap, g.sizeOrder, hint);
   }
 }
 
-// ------------------------
-// Refresh
-// ------------------------
+/* ---------- Refresh ---------- */
 async function refresh() {
   try {
     showError("");
-
-    const start = fromLocalInputValue(startEl.value);
-    const end = fromLocalInputValue(endEl.value);
-
-    const data = await fetchData(start, end);
+    const data = await fetchData();
     lastOvenData = data;
-
     renderKpis(data.kpis);
     renderCurrentView();
-
   } catch (e) {
     showError(e.message);
-    // Keep KPI boxes visible even offline
     renderKpis(null);
-    // Don’t clear lastOvenData; if we have old data, keep rendering it.
     if (lastOvenData) renderCurrentView();
   }
 }
@@ -757,31 +997,33 @@ function setRange(start, end) {
   endEl.value = toLocalInputValue(end);
 }
 
-// Controls
+/* ---------- Controls ---------- */
 applyBtn.addEventListener("click", refresh);
 
 todayBtn.addEventListener("click", () => {
-  const now = new Date();
-  const start = new Date(now); start.setHours(0, 0, 0, 0);
-  const end = new Date(now); end.setHours(23, 59, 59, 999);
+  const { start, end } = todayProdDayRange();
+  setRange(start, end);
+  refresh();
+});
+
+yesterdayBtn?.addEventListener("click", () => {
+  const { start, end } = yesterdayProdDayRange();
+  setRange(start, end);
+  refresh();
+});
+
+lastWeekBtn?.addEventListener("click", () => {
+  const { start, end } = lastWeekProdDayRange();
   setRange(start, end);
   refresh();
 });
 
 downloadCsvBtn?.addEventListener("click", () => {
   const mode = chartViewEl?.value || "timeseries";
-  const sizeFilter = shiftSizeFilterEl?.value || "ALL";
   const stamp = new Date().toISOString().slice(0, 19).replaceAll(":", "-");
-  const filename = `oven_${mode}_${sizeFilter}_${stamp}.csv`;
+  const filename = `oven_${mode}_ALL_${stamp}.csv`;
   const csv = buildOvenCsv();
   downloadTextAsFile(filename, csv);
-});
-
-last8Btn.addEventListener("click", () => {
-  const end = new Date();
-  const start = new Date(end.getTime() - 8 * 60 * 60 * 1000);
-  setRange(start, end);
-  refresh();
 });
 
 shiftBtn.addEventListener("click", () => {
@@ -800,20 +1042,20 @@ liveEl.addEventListener("change", () => {
   }
 });
 
-// View changes (no refetch needed)
+// View changes
 chartViewEl.addEventListener("change", () => {
   setChartMode(chartViewEl.value);
   renderCurrentView();
 });
-shiftSizeFilterEl.addEventListener("change", renderCurrentView);
 
-// Init
+// Time Series size selector
+tsSizeFilterEl?.addEventListener("change", renderCurrentView);
+
+/* ---------- Init ---------- */
 (function init() {
-  const { start, end } = currentShiftRange(new Date());
+  // Default to today's production day window (21:00 -> 21:00)
+  const { start, end } = todayProdDayRange();
   setRange(start, end);
-
-  // default mode
-  setChartMode(chartViewEl.value || "timeseries");
-
+  setChartMode(chartViewEl?.value || "timeseries");
   refresh();
 })();

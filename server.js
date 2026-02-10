@@ -310,7 +310,7 @@ function buildOvenSnapshot(rows, meta, start, end) {
   const sizeSet = new Set();
 
   const countMap = new Map();   // key = bucketISO|size
-  const bakeMap = new Map();    // key = bucketISO|size
+  const bakeMap = new Map();    // key = bucketISO|siz3e
 
   for (const r of rows) {
     const b = new Date(r.BucketTime).toISOString();
@@ -921,18 +921,24 @@ app.get("/manifest/:cellId.json", (req, res) => {
 // Oven APIs
 // --------------------
 function parseRange(req) {
-  const startRaw = req.query.start;
-  const endRaw = req.query.end;
-  const start = startRaw ? new Date(startRaw) : null;
-  const end = endRaw ? new Date(endRaw) : null;
+  const startLocal = String(req.query.startLocal ?? "").trim();
+  const endLocal   = String(req.query.endLocal ?? "").trim();
 
-  if (!start || isNaN(start.getTime())) throw new Error("Invalid start");
-  if (!end || isNaN(end.getTime())) throw new Error("Invalid end");
+  // Treat empty strings as missing, fall back to start/end if needed
+  const startRaw = startLocal || String(req.query.start ?? "").trim();
+  const endRaw   = endLocal   || String(req.query.end ?? "").trim();
+
+  const start = startRaw ? new Date(startRaw) : null;
+  const end   = endRaw ? new Date(endRaw) : null;
+
+  if (!start || Number.isNaN(start.getTime())) throw new Error("Invalid start");
+  if (!end || Number.isNaN(end.getTime())) throw new Error("Invalid end");
   if (end <= start) throw new Error("end must be after start");
 
   // Guardrail (31 days)
   const maxMs = 31 * 24 * 60 * 60 * 1000;
   if (end - start > maxMs) throw new Error("Range too large (max 31 days)");
+
   return { start, end };
 }
 
@@ -943,30 +949,31 @@ function parseRange(req) {
 // Adds KPIs: efficiency + time loss from empty molds.
 app.get("/api/oven/plug-performance", async (req, res) => {
   try {
+    // const { start, end } = parseRange(req);
     const { start, end } = parseRange(req);
 
     const bucketMinutes = 5;
     const bucketMs = bucketMinutes * 60 * 1000;
 
-    // Floor timestamps to 5-min boundaries (UTC) so keys align with toISOString()
-    const floorToBucketUTC = (d) => {
+    // ✅ Floor timestamps to 5-min boundaries in LOCAL time
+    const floorToBucketLocal = (d) => {
       const x = new Date(d);
-      const mins = x.getUTCMinutes();
+      const mins = x.getMinutes();
       const floored = Math.floor(mins / bucketMinutes) * bucketMinutes;
-      x.setUTCMinutes(floored, 0, 0);
+      x.setMinutes(floored, 0, 0);
       return x;
     };
 
-    const startB = floorToBucketUTC(start);
-    const endB = floorToBucketUTC(end);
+    const startB = floorToBucketLocal(start);
+    const endB = floorToBucketLocal(end);
 
-    // Build continuous buckets
+    // ✅ Build continuous buckets as epoch milliseconds (numbers)
     const buckets = [];
     for (let t = startB.getTime(); t <= endB.getTime(); t += bucketMs) {
-      buckets.push(new Date(t).toISOString());
+      buckets.push(t);
     }
 
-    // ✅ Pull filled vs empty counts
+    // Pull filled vs empty counts (SQL rows are sparse)
     const rows = await fetchOvenFillStats({
       startDate: startB,
       endDate: new Date(endB.getTime() + bucketMs), // include last bucket window
@@ -980,12 +987,13 @@ app.get("/api/oven/plug-performance", async (req, res) => {
       .sort((a, b) => Number(a) - Number(b));
 
     // Build filled-only series + KPI totals
-    const filledMap = new Map(); // key: bucketISO|size -> count
+    const filledMap = new Map(); // key: bucketMs|size -> count
     let filledTotal = 0;
     let emptyTotal = 0;
 
     for (const r of rows) {
-      const b = floorToBucketUTC(r.BucketTime).toISOString();
+      // BucketTime coming from SQL is a Date; normalize to local bucket ms
+      const b = floorToBucketLocal(r.BucketTime).getTime();
       const s = String(r.PlugSize);
       const cnt = Number(r.Cnt) || 0;
       const isFilled = Number(r.IsFilled) === 1;
@@ -998,26 +1006,27 @@ app.get("/api/oven/plug-performance", async (req, res) => {
       }
     }
 
-    // Filled-only series aligned to continuous buckets (zero-filled)
+    // Series aligned to continuous buckets (zero-filled)
     const series = {};
     for (const s of sizes) {
       series[s] = buckets.map((b) => filledMap.get(`${b}|${s}`) ?? 0);
     }
 
-    // ✅ KPIs
+    // KPIs
     const totalCycles = filledTotal + emptyTotal;
     const efficiencyPct = totalCycles > 0
-      ? Math.round((filledTotal / totalCycles) * 1000) / 10   // 1 decimal
+      ? Math.round((filledTotal / totalCycles) * 1000) / 10
       : null;
 
-    const lostSeconds = emptyTotal * 15; // 15s per empty mold
+    const lostSeconds = emptyTotal * 15;
 
     res.json({
       ok: true,
+      // Optional: return local strings too if you want to display them later
       start: start.toISOString(),
       end: end.toISOString(),
       bucketMinutes,
-      buckets,
+      buckets,   // ✅ now numeric ms timestamps
       sizes,
       series,
       kpis: {

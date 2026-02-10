@@ -60,7 +60,7 @@
   <div class="oven-wrap">
     <h1 style="margin-top:8px;">Oven Shift Performance</h1>
     <div class="muted">
-      Completed filled molds over time (by MoldSize). Use “Chart View” to switch visualizations.
+      Completed plugs over time. Use “Chart View” to switch visualizations.
     </div>
 
     <div class="oven-controls" style="margin-top:14px;">
@@ -78,7 +78,8 @@
       <button class="btn secondary" id="downloadCsvBtn" type="button">Download CSV</button>
       <button class="btn" id="todayBtn" type="button">Today</button>
       <button class="btn" id="shiftBtn" type="button">This Shift</button>
-      <button class="btn" id="last8Btn" type="button">Last 8 Hours</button>
+      <button class="btn" id="yesterdayBtn" type="button">Yesterday</button>
+      
 
       <div>
         <label for="chartView">Chart View</label>
@@ -100,11 +101,22 @@
         </select>
       </div>
 
+        <!-- Add near Chart View / Shift Chart Size -->
+        <div class="cg ts-view">
+          <label for="tsSizeFilter">Time Series Size</label>
+          <select id="tsSizeFilter">
+            <option value="ALL" selected>All sizes</option>
+            <!-- JS will populate sizes found in data -->
+          </select>
+        </div>
+
       <label style="display:flex; gap:8px; align-items:center; margin-left:8px; font-weight:900;">
         <input id="live" type="checkbox" />
         Live (refresh 60s)
       </label>
+      <button class="btn" id="lastWeekBtn" type="button">Last Week</button>
     </div>
+    
 
     <div class="row" style="margin-top:14px;" id="shiftCards"></div>
     <div class="row" style="margin-top:14px;" id="kpiCards"></div>
@@ -117,7 +129,7 @@
 
     <!-- SHIFT BAR SECTION -->
     <div id="shiftBarsSection" style="margin-top:14px; display:none;">
-      <canvas id="shiftBarChart" width="1200" height="320"></canvas>
+      <canvas id="shiftBarChart" width="1200" height="420"></canvas>
       <div class="legend" id="shiftLegend"></div>
     </div>
 
