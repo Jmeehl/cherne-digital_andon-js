@@ -110,7 +110,6 @@ export async function fetchPlugPerformanceByHour(startDate, endDate) {
 
   return Array.isArray(result.recordset) ? result.recordset : [];
 }
-``
 
 /**
  * Realtime oven performance:
