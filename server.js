@@ -1504,6 +1504,9 @@ app.get("/", (req, res) => res.redirect("/dashboard/quality"));
 app.get("/dashboard/:dept", (req, res) => res.sendFile(path.join(__dirname, "public", "dashboard.html")));
 app.get("/history/:dept", (req, res) => res.sendFile(path.join(__dirname, "public", "history.html")));
 app.get("/cell/:id", (req, res) => res.sendFile(path.join(__dirname, "public", "cell.html")));
+app.get("/oven", (req, res) => res.sendFile(path.join(__dirname, "public", "oven.html")));
+app.get("/oven-performance", (req, res) => res.sendFile(path.join(__dirname, "public", "oven.html")));
+
 
 //const PORT = process.env.PORT ?? 3000;
 //server.listen(PORT, () => console.log(`Running on http://localhost:${PORT}`));
