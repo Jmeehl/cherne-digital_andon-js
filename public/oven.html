@@ -54,12 +54,6 @@
   </style>
 </head>
 
-<section class="panel" id="cureSection">
-  <h2>Avg Cure Time (5 min buckets)</h2>
-  <canvas id="cureChart" width="1200" height="360"></canvas>
-  <div class="muted">Goal range: 45–120 minutes</div>
-</section>
-
 
 <body>
   <div id="topnav"></div>
@@ -91,10 +85,10 @@
       <div>
         <label for="chartView">Chart View</label>
         <select id="chartView">
-          <option value="timeseries" selected>Time Series (5 min)</option>
-          <option value="shiftType">Shift Totals (1st/2nd/3rd)</option>
-          <option value="shiftInstance">Shift Instances (Day + Shift)</option>
+          <option value="timeseries" selected>Completions (Time Series)</option>
           <option value="cureTimeseries">Cure Time (Avg)</option>
+          <option value="shiftType">Shift Totals</option>
+          <option value="shiftInstance">Shift Instances</option>
         </select>
       </div>
 
@@ -125,6 +119,13 @@
       <canvas id="chart" width="1200" height="420"></canvas>
       <div class="legend" id="legend"></div>
     </div>
+
+    <!-- CURE SECTION (hidden unless Cure Time view) -->
+    <section class="panel" id="cureSection" style="display:none; margin-top:14px;">
+      <h2>Avg Cure Time (5 min buckets)</h2>
+      <canvas id="cureChart" width="1200" height="360"></canvas>
+      <div class="muted">Goal range: 45–120 minutes</div>
+    </section>
 
     <!-- SHIFT BAR SECTION -->
     <div id="shiftBarsSection" style="margin-top:14px; display:none;">

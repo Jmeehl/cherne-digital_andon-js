@@ -1019,100 +1019,76 @@ app.get("/api/oven/plug-performance", async (req, res) => {
       ? Math.round((filledTotal / totalCycles) * 1000) / 10
       : null;
 
-    const lostSeconds = emptyTotal * 15;
-    const cure = await fetchOvenCureKpis({ startDate: startB, endDate: new Date(endB.getTime() + bucketMs) });
+            const lostSeconds = emptyTotal * 15;
+    const kpis = {
+      filledTotal,
+      emptyTotal,
+      totalCycles,
+      efficiencyPct,
+      lostSeconds
+    };
 
-    const { rows: cureRows } = await fetchOvenRealtime({
-    startDate: startB,
-    endDate: new Date(endB.getTime() + bucketMs),
-    bucketMinutes: 5
+    // cure KPIs (last/avg cure minutes)
+    const cureKpis = await fetchOvenCureKpis({
+      startDate: startB,
+      endDate: new Date(endB.getTime() + bucketMs)
     });
 
-    // Build bucket list
-const cureBucketSet = new Set();
-const cureSizeSet = new Set();
-for (const r of cureRows) {
-  cureBucketSet.add(new Date(r.BucketTime).toISOString());
-  cureSizeSet.add(String(r.PlugSize));
-}
-const cureBuckets = Array.from(cureBucketSet).sort();
-const cureSizes = Array.from(cureSizeSet).sort((a,b)=>Number(a)-Number(b));
+    kpis.lastCureMinutes = cureKpis?.lastCureMinutes ?? null;
+    kpis.avgCureMinutes = cureKpis?.avgCureMinutes ?? null;
 
-// Map: size -> bucket -> avg
-const cureMap = {};
-for (const s of cureSizes) cureMap[s] = Object.create(null);
+    // cure timeseries per 5-min bucket
+    const { rows: cureRows } = await fetchOvenRealtime({
+      startDate: startB,
+      endDate: new Date(endB.getTime() + bucketMs),
+      bucketMinutes: 5
+    });
 
-for (const r of cureRows) {
-  const b = new Date(r.BucketTime).toISOString();
-  const s = String(r.PlugSize);
-  cureMap[s][b] = (r.AvgBakeMinutes === null || r.AvgBakeMinutes === undefined)
-    ? null
-    : Number(r.AvgBakeMinutes);
-}
+    const cureBucketSet = new Set();
+    const cureSizeSet = new Set();
 
-// Build aligned arrays for each size
-const cureSeries = {};
-for (const s of cureSizes) {
-  cureSeries[s] = cureBuckets.map((b) => cureMap[s][b] ?? null);
-}
-res.json({
-  ok: true,
-  start: startB.toISOString(),
-  end: endB.toISOString(),
-  buckets, sizes, series, kpis,          // existing
-  cure: { buckets: cureBuckets, sizes: cureSizes, series: cureSeries }
-});
+    for (const r of (cureRows || [])) {
+      cureBucketSet.add(new Date(r.BucketTime).toISOString());
+      cureSizeSet.add(String(r.PlugSize));
+    }
 
+    const cureBuckets = Array.from(cureBucketSet).sort();
+    const cureSizes = Array.from(cureSizeSet).sort((a, b) => Number(a) - Number(b));
 
+    const cureMap = {};
+    for (const s of cureSizes) cureMap[s] = Object.create(null);
 
+    for (const r of (cureRows || [])) {
+      const b = new Date(r.BucketTime).toISOString();
+      const s = String(r.PlugSize);
+      cureMap[s][b] =
+        (r.AvgBakeMinutes === null || r.AvgBakeMinutes === undefined)
+          ? null
+          : Number(r.AvgBakeMinutes);
+    }
 
+    const cureSeries = {};
+    for (const s of cureSizes) {
+      cureSeries[s] = cureBuckets.map((b) => cureMap[s][b] ?? null);
+    }
+
+    // ✅ single response
     res.json({
       ok: true,
-      // Optional: return local strings too if you want to display them later
-      start: start.toISOString(),
-      end: end.toISOString(),
+      start: startB.toISOString(),
+      end: endB.toISOString(),
       bucketMinutes,
-      buckets,   // ✅ now numeric ms timestamps
+      buckets,  // numeric ms
       sizes,
       series,
-      kpis: {
-        filledTotal,
-        emptyTotal,
-        totalCycles,
-        efficiencyPct,
-        lostSeconds,
-        lastCureMinutes: cure.lastCureMinutes,
-        avgCureMinutes: cure.avgCureMinutes
+      kpis,
+      cure: {
+        buckets: cureBuckets,
+        sizes: cureSizes,
+        series: cureSeries
       }
     });
-  } catch (e) {
-    res.status(400).json({ ok: false, error: e.message });
-  }
-});
 
-// Realtime snapshot (polling)
-app.get("/api/oven/realtime", (req, res) => res.json({ ok: true, ...ovenSnapshot }));
-
-// Realtime snapshot (custom range/bucket)
-app.get("/api/oven/realtime/query", async (req, res) => {
-  try {
-    const rangeMinutes = Math.max(15, Math.min(24 * 60, Number(req.query.rangeMinutes) || 240));
-    const bucketMinutes = Math.max(1, Math.min(60, Number(req.query.bucketMinutes) || 5));
-    const end = new Date();
-    const start = new Date(end.getTime() - rangeMinutes * 60000);
-
-    const { rows, meta } = await fetchOvenRealtime({ startDate: start, endDate: end, bucketMinutes });
-    const snap = buildOvenSnapshot(rows, meta, start, end);
-    res.json({ ok: true, ...snap });
-  } catch (e) {
-    res.status(400).json({ ok: false, error: e.message });
-  }
-});
-
-// Oven page
-app.get("/oven", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "oven.html"));
-});
 
 // --------------------
 // Mold APIs + page

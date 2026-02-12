@@ -1,36 +1,33 @@
 // public/oven.js
-// Oven Shift Performance (Option A: one chart at a time)
+// Oven Shift Performance
 //
-// Views:
-// - Time Series: single-pen (default All sizes, selectable Size 1..4); downtime shading based on total.
-// - Shift Totals: grouped bars by size within each shift (1st/2nd/3rd) + Grand Total.
-// - Shift Instances: grouped bars by size within each shift instance (Day + Shift) + Grand Total.
+// Chart Views:
+// - timeseries      : Completions (5-min buckets), single-pen with size selector
+// - cureTimeseries  : Avg Cure Time (5-min buckets), single-pen with size selector + goalposts
+// - shiftType       : Shift Totals (1st/2nd/3rd), grouped bars
+// - shiftInstance   : Shift Instances (Day + Shift), grouped bars
 //
 // Quick ranges:
-// - Today  : production day (yesterday 21:00 -> today 21:00)
-// - Yesterday: production day (two days ago 21:00 -> yesterday 21:00)
-// - Last Week: previous calendar week (Sunday 00:00 -> Sunday 00:00)
-
-//
-// This file matches the existing HTML IDs and control layout.
-// (Based on your latest oven.js structure.)
-// ---------------------------------------------------------------------------
+// - Today      : production day (yesterday 21:00 -> today 21:00)
+// - Yesterday  : production day (two days ago 21:00 -> yesterday 21:00)
+// - Last Week  : previous calendar week (Sunday 00:00 -> Sunday 00:00)
+// - Last Prod Hour (live): rolling [now-1h, now]
 
 /* ---------- DOM ---------- */
 const startEl = document.getElementById("start");
 const endEl = document.getElementById("end");
 const applyBtn = document.getElementById("applyBtn");
 const downloadCsvBtn = document.getElementById("downloadCsvBtn");
+
 const todayBtn = document.getElementById("todayBtn");
 const shiftBtn = document.getElementById("shiftBtn");
-const last8Btn = document.getElementById("last8Btn");
 const yesterdayBtn = document.getElementById("yesterdayBtn");
 const lastWeekBtn = document.getElementById("lastWeekBtn");
 const lastHourBtn = document.getElementById("lastHourBtn");
 const liveEl = document.getElementById("live");
 
 const chartViewEl = document.getElementById("chartView");
-const tsSizeFilterEl = document.getElementById("tsSizeFilter");        // NEW: time-series size selector
+const tsSizeFilterEl = document.getElementById("tsSizeFilter");
 
 const timeseriesSection = document.getElementById("timeseriesSection");
 const shiftBarsSection = document.getElementById("shiftBarsSection");
@@ -44,23 +41,26 @@ const errorEl = document.getElementById("error");
 
 const shiftCardsEl = document.getElementById("shiftCards");
 const kpiCardsEl = document.getElementById("kpiCards");
-const cureCanvas = document.getElementById("cureChart");
-const cureSection = document.getElementById("cureSection");
 
+const cureSection = document.getElementById("cureSection");
+const cureCanvas = document.getElementById("cureChart");
 
 /* ---------- State ---------- */
 let liveTimer = null;
 let lastOvenData = null;
 
-// timer specifically for "last production hour" live mode
+// Last hour live mode
 let liveHourTimer = null;
 let liveHourActive = false;
-
 
 /* ---------- Constants ---------- */
 const COLORS = ["#0066cc", "#cc3300", "#2e7d32", "#6a1b9a", "#ff8f00", "#00838f"];
 const EMPTY_MOLD_SECONDS = 15;
-const SHADE_AFTER_EMPTY_BUCKETS = 1; // 1 empty 5-min bucket => shade
+const SHADE_AFTER_EMPTY_BUCKETS = 1;
+
+// Cure time goalposts
+const CURE_LOW_MIN = 45;
+const CURE_HIGH_MIN = 120;
 
 /* ---------- Utils ---------- */
 function pad(n) { return String(n).padStart(2, "0"); }
@@ -73,51 +73,65 @@ function toLocalInputValue(d) {
 function fromLocalInputValue(s) { return new Date(s); }
 
 function showError(msg) {
+  if (!errorEl) return;
   errorEl.style.display = msg ? "block" : "none";
   errorEl.textContent = msg || "";
 }
 
+function fmtDuration(seconds) {
+  const s = Number(seconds || 0);
+  if (!Number.isFinite(s) || s <= 0) return "0m";
+  const mins = Math.round(s / 60);
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60), r = mins % 60;
+  return `${h}h ${r}m`;
+}
+
+function fmtMinutes(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  return `${Math.round(n * 10) / 10} min`;
+}
+
 /* ---------- Shift logic (local) ----------
    Shift 1: 05:00–13:00
-   Shift 2: 13:00–21:00 
-   Shift 3: 21:00–05:00 (cross-midnight). Adjust if you keep 05:30/21:30.
+   Shift 2: 13:00–21:00
+   Shift 3: 21:00–05:00 (cross-midnight)
 ------------------------------------------ */
 function minutesSinceMidnight(d) { return d.getHours() * 60 + d.getMinutes(); }
 function whichShift(localDate) {
   const mins = minutesSinceMidnight(localDate);
 
-  // Shift 3: 21:00 → 24:00 OR 00:00 → 05:30
-  // If you decided on 05:00 exact, change s3End to 5*60.
+  // Shift 3: 21:00 -> 24:00 OR 00:00 -> 05:00
   const s3Start = 21 * 60;
   const s3End = 5 * 60;
   if (mins >= s3Start || mins < s3End) return 3;
 
-  // Shift 2: 13:00 → 21:00 (or 21:30 if you confirm)
+  // Shift 2: 13:00 -> 21:00
   const s2Start = 13 * 60;
-  const s2End = 21 * 60; // or 21*60 + 30;
+  const s2End = 21 * 60;
   if (mins >= s2Start && mins < s2End) return 2;
 
-  // Shift 1: 05:00 → 13:00
-  const s1Start = 5 * 60;
-  const s1End = 13 * 60;
-  if (mins >= s1Start && mins < s1End) return 1;
-
+  // Shift 1: 05:00 -> 13:00
   return 1;
 }
 
 function currentShiftRange(now = new Date()) {
   const s = whichShift(now);
   const base = new Date(now);
+
   function setTime(d, hh, mm) {
     const x = new Date(d); x.setHours(hh, mm, 0, 0); return x;
   }
-  if (s === 1) return { shift: 1, start: setTime(base, 5, 0),  end: setTime(base, 13, 0) };
+
+  if (s === 1) return { shift: 1, start: setTime(base, 5, 0), end: setTime(base, 13, 0) };
   if (s === 2) return { shift: 2, start: setTime(base, 13, 0), end: setTime(base, 21, 0) };
+
   // Shift 3 crosses midnight
   const mins = minutesSinceMidnight(base);
   if (mins >= 21 * 60) {
     const start = setTime(base, 21, 0);
-    const end = new Date(setTime(base, 5, 0).getTime() + 24 * 60 * 60 * 1000); // if end=05:30
+    const end = new Date(setTime(base, 5, 0).getTime() + 24 * 60 * 60 * 1000);
     return { shift: 3, start, end };
   } else {
     const end = setTime(base, 5, 0);
@@ -133,7 +147,7 @@ function shiftInstanceStart(localDate) {
   const start = new Date(d);
   start.setSeconds(0, 0);
 
-  if (sh === 1) { start.setHours(5, 0, 0, 0);  return start; }
+  if (sh === 1) { start.setHours(5, 0, 0, 0); return start; }
   if (sh === 2) { start.setHours(13, 0, 0, 0); return start; }
 
   // shift 3
@@ -150,45 +164,37 @@ function shiftInstanceStart(localDate) {
 
 /* ---------- Production day range (21:00 → next-day 21:00) ---------- */
 function prodDayRangeFor(day /* Date local */) {
-  const end = new Date(day);   end.setHours(21, 0, 0, 0);            // 21:00 local
-  const start = new Date(end); start.setDate(start.getDate() - 1);   // previous day 21:00
+  const end = new Date(day);   end.setHours(21, 0, 0, 0);
+  const start = new Date(end); start.setDate(start.getDate() - 1);
   return { start, end };
 }
 function todayProdDayRange() {
-  const today = new Date(); return prodDayRangeFor(today);
+  return prodDayRangeFor(new Date());
 }
 function yesterdayProdDayRange() {
-  const y = new Date(); y.setDate(y.getDate() - 1); return prodDayRangeFor(y);
+  const y = new Date(); y.setDate(y.getDate() - 1);
+  return prodDayRangeFor(y);
 }
-// Previous calendar week: Sunday 00:00 -> following Sunday 00:00 (local time)
+
+// Previous calendar week: Sunday 00:00 -> this Sunday 00:00
 function previousWeekSundayToSundayRange(now = new Date()) {
-  // Start of *this* week (Sunday 00:00 local)
   const startOfThisWeek = new Date(now);
   startOfThisWeek.setHours(0, 0, 0, 0);
-  startOfThisWeek.setDate(startOfThisWeek.getDate() - startOfThisWeek.getDay()); // getDay(): 0=Sun
+  startOfThisWeek.setDate(startOfThisWeek.getDate() - startOfThisWeek.getDay()); // 0=Sun
 
-  // Previous week Sunday 00:00
   const start = new Date(startOfThisWeek);
   start.setDate(start.getDate() - 7);
 
-  // End = this week Sunday 00:00
   const end = startOfThisWeek;
-
   return { start, end };
 }
 
-
-/* ---------- Fetch (LOCAL params) ----------
-   The server's parseRange(req) prefers startLocal/endLocal (YYYY-MM-DDTHH:mm).
-   (Your server.js already implements that path.)
------------------------------------------------- */
+/* ---------- Fetch ---------- */
 async function fetchData() {
-  const startLocal = startEl.value;
-  const endLocal = endEl.value;
+  const startLocal = startEl?.value;
+  const endLocal = endEl?.value;
 
-  if (!startLocal || !endLocal) {
-    throw new Error("Start and End must be selected");
-  }
+  if (!startLocal || !endLocal) throw new Error("Start and End must be selected");
 
   const url = `/api/oven/plug-performance?startLocal=${encodeURIComponent(startLocal)}&endLocal=${encodeURIComponent(endLocal)}`;
   const resp = await fetch(url, { cache: "no-store" });
@@ -197,9 +203,8 @@ async function fetchData() {
   return data;
 }
 
-/* ---------- Normalize API shape ---------- */
 function unpackSeries(data) {
-  const buckets = Array.isArray(data.buckets) ? data.buckets : (Array.isArray(data.hours) ? data.hours : []);
+  const buckets = Array.isArray(data.buckets) ? data.buckets : [];
   const sizes = Array.isArray(data.sizes) ? data.sizes : [];
   const series = data.series || {};
   return { buckets, sizes, series };
@@ -218,6 +223,7 @@ function computeSystemStatusFromSeries() {
     for (const s of sizes) total += (series[s]?.[i] || 0);
     if (total > 0) lastNonZeroIdx = i;
   }
+
   if (lastNonZeroIdx === -1) return { status: "Idle/Off", sinceMin: null };
 
   const lastTs = new Date(buckets[lastNonZeroIdx]).getTime();
@@ -227,24 +233,12 @@ function computeSystemStatusFromSeries() {
 }
 
 /* ---------- KPIs ---------- */
-function fmtDuration(seconds) {
-  const s = Number(seconds || 0);
-  if (!Number.isFinite(s) || s <= 0) return "0m";
-  const mins = Math.round(s / 60);
-  if (mins < 60) return `${mins}m`;
-  const h = Math.floor(mins / 60), r = mins % 60;
-  return `${h}h ${r}m`;
-}
-
 function renderKpis(kpis) {
   if (!kpiCardsEl) return;
 
   const filled = Number(kpis?.filledTotal);
   const empty = Number(kpis?.emptyTotal);
   const total = Number(kpis?.totalCycles);
-  const lastCure = fmtMinutes(kpis?.lastCureMinutes);
-  const avgCure  = fmtMinutes(kpis?.avgCureMinutes);
-
 
   const eff = (kpis?.efficiencyPct === null || kpis?.efficiencyPct === undefined)
     ? "—" : `${kpis.efficiencyPct}%`;
@@ -252,14 +246,14 @@ function renderKpis(kpis) {
   const lost = fmtDuration(kpis?.lostSeconds);
 
   const filledDisp = Number.isFinite(filled) ? filled : "—";
-  const emptyDisp  = Number.isFinite(empty)  ? empty  : "—";
-  const totalDisp  = Number.isFinite(total)  ? total  : "—";
-
-  const emptyRate = (Number.isFinite(empty) && Number.isFinite(total) && total > 0)
-    ? `${Math.round((empty / total) * 1000) / 10}%` : "—";
+  const emptyDisp = Number.isFinite(empty) ? empty : "—";
+  const totalDisp = Number.isFinite(total) ? total : "—";
 
   const sys = computeSystemStatusFromSeries();
   const sysText = (sys.sinceMin === null) ? sys.status : `${sys.status} (last ${sys.sinceMin}m)`;
+
+  const lastCure = fmtMinutes(kpis?.lastCureMinutes);
+  const avgCure = fmtMinutes(kpis?.avgCureMinutes);
 
   kpiCardsEl.innerHTML = `
     <div class="card">
@@ -284,8 +278,8 @@ function renderKpis(kpis) {
 
     <div class="card">
       <h3>Last Cure Time</h3>
-     <div class="muted">${lastCure}</div>
-     <div class="muted" style="margin-top:6px;">Extract − Mold Close</div>
+      <div class="muted">${lastCure}</div>
+      <div class="muted" style="margin-top:6px;">Extract − Mold Close</div>
     </div>
 
     <div class="card">
@@ -296,13 +290,15 @@ function renderKpis(kpis) {
   `;
 }
 
-/* ---------- Shift cards (for quick glance; time-series only) ---------- */
+/* ---------- Shift cards (time-series completions only) ---------- */
 function renderShiftCards(buckets, sizes, series) {
+  if (!shiftCardsEl) return;
+
   const totals = { 1: {}, 2: {}, 3: {} };
   for (const sh of [1, 2, 3]) for (const s of sizes) totals[sh][s] = 0;
 
-  buckets.forEach((iso, idx) => {
-    const d = new Date(iso);
+  buckets.forEach((t, idx) => {
+    const d = new Date(t);
     const sh = whichShift(d);
     for (const s of sizes) totals[sh][s] += (series[s]?.[idx] || 0);
   });
@@ -315,30 +311,29 @@ function renderShiftCards(buckets, sizes, series) {
     h3.textContent = `${sh} ${sh === 1 ? "st" : sh === 2 ? "nd" : "rd"} Shift Total`;
     const p = document.createElement("div");
     p.className = "muted";
-    const lines = sizes.map((s) => `Size ${s}: ${totals[sh][s]}`);
-    p.textContent = lines.join("  |  ");
+    p.textContent = sizes.map((s) => `Size ${s}: ${totals[sh][s]}`).join("  |  ");
     card.appendChild(h3);
     card.appendChild(p);
     shiftCardsEl.appendChild(card);
   });
 }
 
-/* ---------- Single-pen Time Series helpers ---------- */
+/* ---------- Size selector ---------- */
 function ensureTsSizeOptions(sizes) {
   if (!tsSizeFilterEl) return;
   const current = tsSizeFilterEl.value || "ALL";
-  tsSizeFilterEl.innerHTML = `<option value="ALL">All sizes</option>` +
-    sizes.map(s => `<option value="${String(s)}">Size ${s}</option>`).join("");
+  tsSizeFilterEl.innerHTML =
+    `<option value="ALL">All sizes</option>` +
+    sizes.map((s) => `<option value="${String(s)}">Size ${s}</option>`).join("");
   if ([...tsSizeFilterEl.options].some(o => o.value === current)) {
     tsSizeFilterEl.value = current;
   }
 }
 
+/* ---------- Time series (completions) ---------- */
 function getTsLine(buckets, sizes, series, sel) {
   if (sel === "ALL") {
-    const line = buckets.map((_, i) =>
-      sizes.reduce((t, s) => t + (series[s]?.[i] || 0), 0)
-    );
+    const line = buckets.map((_, i) => sizes.reduce((t, s) => t + (series[s]?.[i] || 0), 0));
     return { line, label: "All sizes" };
   }
   const data = series[sel] || [];
@@ -346,159 +341,10 @@ function getTsLine(buckets, sizes, series, sel) {
   return { line, label: `Size ${sel}` };
 }
 
-function drawCureTimeSeries(cure, selSize = "ALL") {
-  if (!cureCanvas || !cure?.buckets?.length) return;
-
-  const buckets = cure.buckets;
-  const sizes = cure.sizes || [];
-  const series = cure.series || {};
-
-  // Build the line: either ALL sizes (avg of non-null avgs) or one size
-  let line = [];
-  let label = "All sizes";
-
-  if (selSize !== "ALL") {
-    label = `Size ${selSize}`;
-    line = buckets.map((_, i) => {
-      const v = series[selSize]?.[i];
-      return (v === null || v === undefined) ? null : Number(v);
-    });
-  } else {
-    line = buckets.map((_, i) => {
-      const vals = sizes
-        .map(s => series[s]?.[i])
-        .filter(v => v !== null && v !== undefined && Number.isFinite(Number(v)))
-        .map(Number);
-      if (!vals.length) return null;
-      return vals.reduce((a,b)=>a+b,0) / vals.length;
-    });
-  }
-
-  const ctx = cureCanvas.getContext("2d");
-  const W = cureCanvas.width, H = cureCanvas.height;
-  const padL = 60, padR = 20, padT = 18, padB = 44;
-  const plotW = W - padL - padR;
-  const plotH = H - padT - padB;
-  const N = buckets.length;
-
-  // Y scaling: include goalposts so lines are always visible
-  const LOW = 45;
-  const HIGH = 120;
-  let maxY = Math.max(HIGH, 5);
-  let minY = Math.min(LOW, 0);
-
-  for (const v of line) {
-    if (v === null || v === undefined) continue;
-    const n = Number(v);
-    if (!Number.isFinite(n)) continue;
-    maxY = Math.max(maxY, n);
-    minY = Math.min(minY, n);
-  }
-  // add headroom
-  maxY = Math.ceil(maxY * 1.10);
-  minY = Math.floor(Math.max(0, minY - 5));
-
-  function yFor(val) {
-    const t = (val - minY) / (maxY - minY || 1);
-    return padT + plotH - (plotH * t);
-  }
-  function xFor(i) {
-    return padL + plotW * (N === 1 ? 0 : i / (N - 1));
-  }
-
-  // background
-  ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = isDark() ? "#0f1419" : "#ffffff";
-  ctx.fillRect(0, 0, W, H);
-
-  // grid
-  ctx.strokeStyle = isDark() ? "rgba(255,255,255,0.10)" : "#e6e6e6";
-  ctx.lineWidth = 1;
-  const gridLines = 5;
-  for (let i = 0; i <= gridLines; i++) {
-    const y = padT + (plotH * i / gridLines);
-    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
-  }
-
-  // axes
-  ctx.strokeStyle = isDark() ? "rgba(255,255,255,0.35)" : "#333";
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(padL, padT);
-  ctx.lineTo(padL, padT + plotH);
-  ctx.lineTo(padL + plotW, padT + plotH);
-  ctx.stroke();
-
-  // Y labels
-  ctx.fillStyle = isDark() ? "#e6e8ea" : "#333";
-  ctx.font = "12px sans-serif";
-  ctx.textAlign = "right";
-  ctx.textBaseline = "middle";
-  for (let i = 0; i <= gridLines; i++) {
-    const val = Math.round(maxY - (maxY - minY) * (i / gridLines));
-    const y = padT + (plotH * i / gridLines);
-    ctx.fillText(String(val), padL - 8, y);
-  }
-
-  // X labels
-  const step = Math.max(1, Math.floor(N / 12));
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  for (let i = 0; i < N; i += step) {
-    const x = xFor(i);
-    const d = new Date(buckets[i]);
-    ctx.fillText(`${pad(d.getHours())}:${pad(d.getMinutes())}`, x, padT + plotH + 10);
-  }
-
-  // goalpost lines
-  ctx.save();
-  ctx.setLineDash([6, 6]);
-  ctx.lineWidth = 2;
-
-  // low (45)
-  ctx.strokeStyle = isDark() ? "rgba(0,255,0,0.55)" : "rgba(0,160,0,0.65)";
-  ctx.beginPath();
-  ctx.moveTo(padL, yFor(LOW));
-  ctx.lineTo(padL + plotW, yFor(LOW));
-  ctx.stroke();
-
-  // high (120)
-  ctx.strokeStyle = isDark() ? "rgba(255,165,0,0.55)" : "rgba(220,120,0,0.70)";
-  ctx.beginPath();
-  ctx.moveTo(padL, yFor(HIGH));
-  ctx.lineTo(padL + plotW, yFor(HIGH));
-  ctx.stroke();
-  ctx.restore();
-
-  // cure line (skip null gaps)
-  ctx.strokeStyle = COLORS[0];
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  let started = false;
-  for (let i = 0; i < N; i++) {
-    const v = line[i];
-    if (v === null || v === undefined || !Number.isFinite(Number(v))) {
-      started = false;
-      continue;
-    }
-    const x = xFor(i);
-    const y = yFor(Number(v));
-    if (!started) { ctx.moveTo(x, y); started = true; }
-    else ctx.lineTo(x, y);
-  }
-  ctx.stroke();
-
-  // title label (simple)
-  ctx.fillStyle = isDark() ? "#e6e8ea" : "#333";
-  ctx.font = "13px sans-serif";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "top";
-  ctx.fillText(`Avg Cure Time — ${label}`, padL, 6);
-}
-
-
 function buildTimeSeriesLegendSingle(label) {
+  if (!legendEl) return;
   legendEl.innerHTML = "";
+
   const item = document.createElement("div");
   item.className = "item";
   const sw = document.createElement("span");
@@ -532,6 +378,7 @@ function shadeStopped(ctx, mask, padL, padT, plotW, plotH, N) {
   if (N < 2) return;
   const stepPx = plotW / (N - 1);
   const xFor = (i) => padL + plotW * (i / (N - 1));
+
   ctx.save();
   ctx.fillStyle = isDark() ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.07)";
   let i = 0;
@@ -550,6 +397,7 @@ function shadeStopped(ctx, mask, padL, padT, plotW, plotH, N) {
 }
 
 function drawTimeSeriesSingle(buckets, sizes, series, sel) {
+  if (!canvas) return;
   const { line, label } = getTsLine(buckets, sizes, series, sel);
 
   const ctx = canvas.getContext("2d");
@@ -593,15 +441,14 @@ function drawTimeSeriesSingle(buckets, sizes, series, sel) {
     ctx.fillText(String(val), padL - 8, y);
   }
 
-  // X labels (HH:mm)
+  // X labels
   const step = Math.max(1, Math.floor(N / 12));
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
   for (let i = 0; i < N; i += step) {
     const x = padL + (plotW * (N === 1 ? 0 : i / (N - 1)));
     const d = new Date(buckets[i]);
-    const labelX = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    ctx.fillText(labelX, x, padT + plotH + 10);
+    ctx.fillText(`${pad(d.getHours())}:${pad(d.getMinutes())}`, x, padT + plotH + 10);
   }
 
   // Axes
@@ -613,7 +460,7 @@ function drawTimeSeriesSingle(buckets, sizes, series, sel) {
   ctx.lineTo(padL + plotW, padT + plotH);
   ctx.stroke();
 
-  // Single line
+  // Line
   ctx.strokeStyle = COLORS[0];
   ctx.lineWidth = 3;
   ctx.beginPath();
@@ -627,38 +474,146 @@ function drawTimeSeriesSingle(buckets, sizes, series, sel) {
   buildTimeSeriesLegendSingle(label);
 }
 
-/* ---------- Grouped bars (Shift Totals / Shift Instances) ---------- */
-function buildBarLegendSizes(sizeOrder) {
-  if (!shiftLegendEl) return;
+/* ---------- Cure time series ---------- */
+function drawCureTimeSeries(cure, selSize = "ALL") {
+  if (!cureCanvas || !cure?.buckets?.length) return;
 
-  const legend = document.createElement("div");
-  legend.className = "legend";
-  legend.style.marginTop = "8px";
-  legend.style.display = "flex";
-  legend.style.flexWrap = "wrap";
-  legend.style.gap = "14px";
+  const buckets = cure.buckets;
+  const sizes = cure.sizes || [];
+  const series = cure.series || {};
 
-  sizeOrder.forEach((s, i) => {
-    const item = document.createElement("div");
-    item.className = "item";
-    item.style.display = "flex";
-    item.style.alignItems = "center";
-    item.style.gap = "8px";
-    const sw = document.createElement("span");
-    sw.className = "swatch";
-    sw.style.width = "14px";
-    sw.style.height = "14px";
-    sw.style.borderRadius = "3px";
-    sw.style.background = COLORS[i % COLORS.length];
-    item.appendChild(sw);
-    item.appendChild(document.createTextNode(`Size ${s}`));
-    legend.appendChild(item);
-  });
+  let line = [];
+  let label = "All sizes";
 
-  shiftLegendEl.innerHTML = "";
-  shiftLegendEl.appendChild(legend);
+  if (selSize !== "ALL") {
+    label = `Size ${selSize}`;
+    line = buckets.map((_, i) => {
+      const v = series[selSize]?.[i];
+      return (v === null || v === undefined) ? null : Number(v);
+    });
+  } else {
+    line = buckets.map((_, i) => {
+      const vals = sizes
+        .map(s => series[s]?.[i])
+        .filter(v => v !== null && v !== undefined && Number.isFinite(Number(v)))
+        .map(Number);
+      if (!vals.length) return null;
+      return vals.reduce((a, b) => a + b, 0) / vals.length;
+    });
+  }
+
+  const ctx = cureCanvas.getContext("2d");
+  const W = cureCanvas.width, H = cureCanvas.height;
+  const padL = 60, padR = 20, padT = 18, padB = 44;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const N = buckets.length;
+
+  // Y scaling includes goalposts
+  let maxY = Math.max(CURE_HIGH_MIN, 5);
+  let minY = Math.min(CURE_LOW_MIN, 0);
+
+  for (const v of line) {
+    if (v === null || v === undefined) continue;
+    const n = Number(v);
+    if (!Number.isFinite(n)) continue;
+    maxY = Math.max(maxY, n);
+    minY = Math.min(minY, n);
+  }
+  maxY = Math.ceil(maxY * 1.10);
+  minY = Math.floor(Math.max(0, minY - 5));
+
+  function yFor(val) {
+    const t = (val - minY) / (maxY - minY || 1);
+    return padT + plotH - (plotH * t);
+  }
+  function xFor(i) {
+    return padL + plotW * (N === 1 ? 0 : i / (N - 1));
+  }
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = isDark() ? "#0f1419" : "#ffffff";
+  ctx.fillRect(0, 0, W, H);
+
+  // grid
+  ctx.strokeStyle = isDark() ? "rgba(255,255,255,0.10)" : "#e6e6e6";
+  ctx.lineWidth = 1;
+  const gridLines = 5;
+  for (let i = 0; i <= gridLines; i++) {
+    const y = padT + (plotH * i / gridLines);
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
+  }
+
+  // axes
+  ctx.strokeStyle = isDark() ? "rgba(255,255,255,0.35)" : "#333";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(padL, padT);
+  ctx.lineTo(padL, padT + plotH);
+  ctx.lineTo(padL + plotW, padT + plotH);
+  ctx.stroke();
+
+  // y labels
+  ctx.fillStyle = isDark() ? "#e6e8ea" : "#333";
+  ctx.font = "12px sans-serif";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  for (let i = 0; i <= gridLines; i++) {
+    const val = Math.round(maxY - (maxY - minY) * (i / gridLines));
+    const y = padT + (plotH * i / gridLines);
+    ctx.fillText(String(val), padL - 8, y);
+  }
+
+  // x labels
+  const step = Math.max(1, Math.floor(N / 12));
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  for (let i = 0; i < N; i += step) {
+    const x = xFor(i);
+    const d = new Date(buckets[i]);
+    ctx.fillText(`${pad(d.getHours())}:${pad(d.getMinutes())}`, x, padT + plotH + 10);
+  }
+
+  // goalposts
+  ctx.save();
+  ctx.setLineDash([6, 6]);
+  ctx.lineWidth = 2;
+
+  ctx.strokeStyle = isDark() ? "rgba(0,255,0,0.55)" : "rgba(0,160,0,0.65)";
+  ctx.beginPath(); ctx.moveTo(padL, yFor(CURE_LOW_MIN)); ctx.lineTo(padL + plotW, yFor(CURE_LOW_MIN)); ctx.stroke();
+
+  ctx.strokeStyle = isDark() ? "rgba(255,165,0,0.55)" : "rgba(220,120,0,0.70)";
+  ctx.beginPath(); ctx.moveTo(padL, yFor(CURE_HIGH_MIN)); ctx.lineTo(padL + plotW, yFor(CURE_HIGH_MIN)); ctx.stroke();
+
+  ctx.restore();
+
+  // line (skip gaps)
+  ctx.strokeStyle = COLORS[0];
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  let started = false;
+  for (let i = 0; i < N; i++) {
+    const v = line[i];
+    if (v === null || v === undefined || !Number.isFinite(Number(v))) {
+      started = false;
+      continue;
+    }
+    const x = xFor(i);
+    const y = yFor(Number(v));
+    if (!started) { ctx.moveTo(x, y); started = true; }
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // title
+  ctx.fillStyle = isDark() ? "#e6e8ea" : "#333";
+  ctx.font = "13px sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.fillText(`Avg Cure Time — ${label}`, padL, 6);
 }
 
+/* ---------- Grouped bars (shift totals / instances) ---------- */
 function computeTotalsByShiftTypeGrouped(buckets, sizes, series) {
   const sizeOrder = [...sizes].sort((a, b) => Number(a) - Number(b));
   const bySize = new Map(sizeOrder.map(s => [s, [0, 0, 0]])); // [shift1, shift2, shift3]
@@ -675,11 +630,7 @@ function computeTotalsByShiftTypeGrouped(buckets, sizes, series) {
 
   const labels = ["1st Shift", "2nd Shift", "3rd Shift"];
   const seriesMap = Object.fromEntries(sizeOrder.map(s => [s, bySize.get(s)]));
-  const totals = labels.map((_, col) =>
-    sizeOrder.reduce((sum, s) => sum + (seriesMap[s][col] || 0), 0)
-  );
-
-  return { labels, sizeOrder, seriesMap, totals };
+  return { labels, sizeOrder, seriesMap };
 }
 
 function computeTotalsByShiftInstanceGrouped(buckets, sizes, series) {
@@ -722,79 +673,44 @@ function computeTotalsByShiftInstanceGrouped(buckets, sizes, series) {
 
   const labels = keys.map(k => {
     const { start, sh } = keyMeta.get(k);
-    const day = `${start.getMonth()+1}/${start.getDate()}`;
+    const day = `${start.getMonth() + 1}/${start.getDate()}`;
     const shName = sh === 1 ? "1st" : sh === 2 ? "2nd" : "3rd";
     return `${day} ${shName}`;
   });
 
-  const totals = labels.map((_, col) =>
-    sizeOrder.reduce((sum, s) => sum + (seriesMap[s][col] || 0), 0)
-  );
-
-  return { labels, sizeOrder, seriesMap, totals };
-}
-
-/* Render a simple Grand Total box under the grouped bar legend */
-function renderGrandTotalBox(grandTotal) {
-  if (!shiftLegendEl) return;
-  // Create/replace a small total box
-  let box = document.getElementById("barGrandTotal");
-  if (!box) {
-    box = document.createElement("div");
-    box.id = "barGrandTotal";
-    box.style.marginTop = "8px";
-    box.style.fontWeight = "900";
-    box.style.padding = "8px 10px";
-    box.style.border = "1px solid #ddd";
-    box.style.borderRadius = "8px";
-    box.style.display = "inline-block";
-    box.style.background = isDark() ? "#12171d" : "#ffffff";
-    shiftLegendEl.appendChild(box);
-  }
-  box.textContent = `Grand Total: ${grandTotal}`;
+  return { labels, sizeOrder, seriesMap };
 }
 
 function drawGroupedBars(labels, seriesMap, sizeOrder, hintText) {
-  if (!shiftBarCanvas) return;
+  if (!shiftBarCanvas || !shiftLegendEl) return;
   const ctx = shiftBarCanvas.getContext("2d");
   const W = shiftBarCanvas.width, H = shiftBarCanvas.height;
 
-  // More bottom padding to fit x-label + group-total box
   const padL = 60, padR = 20, padT = 18, padB = 96;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
 
-  const N = labels.length;         // Number of shift groups
-  const S = sizeOrder.length;      // Number of bars per group (sizes)
+  const N = labels.length;
+  const S = sizeOrder.length;
 
-  // ---- Compute per-group totals + grand total (used for boxes & sidebar)
   const totals = labels.map((_, i) =>
     sizeOrder.reduce((sum, s) => sum + (seriesMap[s]?.[i] || 0), 0)
   );
   const grandTotal = totals.reduce((a, b) => a + b, 0);
 
-  // ----------------------------------------------------------
-  // Y‑axis scaling — based ONLY on the highest single bar
-  // ----------------------------------------------------------
   const highestSingleBar = Math.max(
-    5, // minimum height so small datasets still look okay
+    5,
     ...sizeOrder.map(s => Math.max(...(seriesMap[s] || [0])))
   );
+  const maxY = Math.max(100, Math.ceil(highestSingleBar * 1.05));
 
-  const HEADROOM = 1.05;   // 5% headroom (looks good)
-  const MIN_Y    = 100;    // minimum axis height (tune or set to 0 to disable)
-  const maxY = Math.max(MIN_Y, Math.ceil(highestSingleBar * HEADROOM));
-
-  // ---- Background
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = isDark() ? "#0f1419" : "#ffffff";
   ctx.fillRect(0, 0, W, H);
 
-  // ---- Grid lines
   ctx.strokeStyle = isDark() ? "rgba(255,255,255,0.10)" : "#e6e6e6";
   ctx.lineWidth = 1;
   const gridLines = 5;
-
   for (let i = 0; i <= gridLines; i++) {
     const y = Math.round(padT + (plotH * i / gridLines));
     ctx.beginPath();
@@ -803,19 +719,17 @@ function drawGroupedBars(labels, seriesMap, sizeOrder, hintText) {
     ctx.stroke();
   }
 
-  // ---- Y-axis labels
-  ctx.fillStyle = isDark() ? "#e6e8ea" : "#333";
+  const textColor = isDark() ? "#e6e8ea" : "#333";
+  ctx.fillStyle = textColor;
   ctx.font = "12px sans-serif";
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
-
   for (let i = 0; i <= gridLines; i++) {
     const val = Math.round(maxY * (1 - i / gridLines));
     const y = Math.round(padT + (plotH * i / gridLines));
     ctx.fillText(String(val), padL - 8, y);
   }
 
-  // ---- Axis lines
   ctx.strokeStyle = isDark() ? "rgba(255,255,255,0.35)" : "#333";
   ctx.lineWidth = 1.5;
   ctx.beginPath();
@@ -829,84 +743,59 @@ function drawGroupedBars(labels, seriesMap, sizeOrder, hintText) {
     return;
   }
 
-  // ----------------------------------------------------------
-  // Group + bar geometry
-  // ----------------------------------------------------------
   const groupGap = Math.max(16, Math.min(40, Math.floor(plotW / Math.max(6, N * 6))));
-  const groupW   = (plotW - groupGap * (N + 1)) / N;
+  const groupW = (plotW - groupGap * (N + 1)) / N;
 
-  const barGap   = Math.max(6, Math.min(14, Math.floor(groupW / Math.max(6, S * 6))));
-  let barW       = (groupW - barGap * (S - 1)) / S;
-
-  if (barW < 3) {
-    const spare = Math.min(barGap - 2, 6);
-    const newGap = Math.max(2, barGap - spare);
-    barW = (groupW - newGap * (S - 1)) / S;
-  }
+  const barGap = Math.max(6, Math.min(14, Math.floor(groupW / Math.max(6, S * 6))));
+  let barW = (groupW - barGap * (S - 1)) / S;
   barW = Math.max(4, Math.floor(barW));
 
-  const textColor = isDark() ? "#e6e8ea" : "#333";
-
-  // ----------------------------------------------------------
-  // Render bars + labels + group totals
-  // ----------------------------------------------------------
   for (let i = 0; i < N; i++) {
     const xGroup = Math.round(padL + groupGap + i * (groupW + groupGap));
 
-    // ---- Bars per size inside group
     sizeOrder.forEach((s, si) => {
       const v = Number(seriesMap[s]?.[i] || 0);
       const h = Math.round(plotH * (v / maxY));
       const y0 = Math.round(padT + plotH - h);
       const x0 = Math.round(xGroup + si * (barW + barGap));
 
-      // Draw bar
-      const barColor = COLORS[si % COLORS.length];
-      ctx.fillStyle = barColor;
+      ctx.fillStyle = COLORS[si % COLORS.length];
+      ctx.fillRect(x0, y0, barW, h);
 
-      const safeBarW = Math.max(1, Math.min(barW, padL + plotW - x0));
-      ctx.fillRect(x0, y0, safeBarW, h);
-
-      // ---- Value label ON the bar
+      // label
       const label = String(v);
       ctx.font = "12px sans-serif";
       ctx.textAlign = "center";
-
       if (h >= 18) {
-        // Inside bar
         ctx.fillStyle = "#ffffff";
         ctx.textBaseline = "middle";
-        ctx.fillText(label, Math.round(x0 + safeBarW / 2), Math.round(y0 + h / 2));
+        ctx.fillText(label, Math.round(x0 + barW / 2), Math.round(y0 + h / 2));
       } else {
-        // Just above bar
         ctx.fillStyle = textColor;
         ctx.textBaseline = "bottom";
-        ctx.fillText(label, Math.round(x0 + safeBarW / 2), Math.round(y0 - 2));
+        ctx.fillText(label, Math.round(x0 + barW / 2), Math.round(y0 - 2));
       }
     });
 
-    // ---- X-axis label
+    // x label
     const xLabel = Math.round(xGroup + groupW / 2);
     const yLabel = Math.round(padT + plotH + 12);
-
     ctx.fillStyle = textColor;
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     ctx.font = "12px sans-serif";
     ctx.fillText(labels[i], xLabel, yLabel);
 
-    // ---- Per-group total BOX (under the label)
+    // group total box
     const tot = totals[i];
     const boxText = String(tot);
-    const paddingX = 8, paddingY = 4;
+    const paddingX = 8;
     const textW = ctx.measureText(boxText).width;
-
     const boxW = Math.ceil(textW + paddingX * 2);
     const boxH = 22;
     const boxX = Math.round(xLabel - boxW / 2);
     const boxY = Math.round(yLabel + 14);
 
-    // Box background
     ctx.fillStyle = isDark() ? "#12171d" : "#ffffff";
     ctx.strokeStyle = isDark() ? "#2a3139" : "#ddd";
     ctx.lineWidth = 1;
@@ -915,16 +804,13 @@ function drawGroupedBars(labels, seriesMap, sizeOrder, hintText) {
     ctx.fill();
     ctx.stroke();
 
-    // Box text
     ctx.fillStyle = textColor;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(boxText, Math.round(boxX + boxW / 2), Math.round(boxY + boxH / 2));
   }
 
-  // ----------------------------------------------------------
-  // Legend + right-side ALL SHIFTS panel
-  // ----------------------------------------------------------
+  // Legend pane
   shiftLegendEl.innerHTML = "";
   const wrap = document.createElement("div");
   wrap.style.display = "flex";
@@ -933,7 +819,6 @@ function drawGroupedBars(labels, seriesMap, sizeOrder, hintText) {
   wrap.style.gap = "16px";
   wrap.style.flexWrap = "wrap";
 
-  // ---------- LEFT: hint + size legend ----------
   const left = document.createElement("div");
   left.style.display = "flex";
   left.style.flexDirection = "column";
@@ -952,17 +837,10 @@ function drawGroupedBars(labels, seriesMap, sizeOrder, hintText) {
 
   sizeOrder.forEach((s, i) => {
     const item = document.createElement("div");
-    item.style.display = "flex";
-    item.style.alignItems = "center";
-    item.style.gap = "8px";
-
+    item.className = "item";
     const sw = document.createElement("span");
     sw.className = "swatch";
-    sw.style.width = "14px";
-    sw.style.height = "14px";
-    sw.style.borderRadius = "3px";
     sw.style.background = COLORS[i % COLORS.length];
-
     item.appendChild(sw);
     item.appendChild(document.createTextNode(`Size ${s}`));
     legend.appendChild(item);
@@ -970,7 +848,6 @@ function drawGroupedBars(labels, seriesMap, sizeOrder, hintText) {
 
   left.appendChild(legend);
 
-  // ---------- RIGHT: ALL SHIFTS panel ----------
   const right = document.createElement("div");
   right.style.minWidth = "220px";
   right.style.border = "1px solid " + (isDark() ? "#2a3139" : "#ddd");
@@ -983,24 +860,21 @@ function drawGroupedBars(labels, seriesMap, sizeOrder, hintText) {
   title.textContent = "ALL Shifts";
   title.style.marginBottom = "6px";
 
-  const ul = document.createElement("div");
-  ul.style.display = "grid";
-  ul.style.gridTemplateColumns = "1fr auto";
-  ul.style.gap = "4px 10px";
+  const grid = document.createElement("div");
+  grid.style.display = "grid";
+  grid.style.gridTemplateColumns = "1fr auto";
+  grid.style.gap = "4px 10px";
 
-  // per-size sums across all groups
   sizeOrder.forEach((s, i) => {
     const sum = (seriesMap[s] || []).reduce((a, b) => a + (b || 0), 0);
     const name = document.createElement("div");
     name.textContent = `Size ${s}:`;
-
     const val = document.createElement("div");
     val.textContent = String(sum);
     val.style.textAlign = "right";
     val.style.color = COLORS[i % COLORS.length];
-
-    ul.appendChild(name);
-    ul.appendChild(val);
+    grid.appendChild(name);
+    grid.appendChild(val);
   });
 
   const hr = document.createElement("div");
@@ -1008,34 +882,21 @@ function drawGroupedBars(labels, seriesMap, sizeOrder, hintText) {
   hr.style.background = isDark() ? "#2a3139" : "#ddd";
   hr.style.margin = "8px 0";
 
-  const totalRow = document.createElement("div");
-  totalRow.style.display = "grid";
-  totalRow.style.gridTemplateColumns = "1fr auto";
-  totalRow.style.gap = "4px 10px";
-
   const totalLabel = document.createElement("div");
   totalLabel.textContent = "Total Balls";
-
   const totalVal = document.createElement("div");
   totalVal.textContent = String(grandTotal);
   totalVal.style.textAlign = "right";
 
   right.appendChild(title);
-  right.appendChild(ul);
+  right.appendChild(grid);
   right.appendChild(hr);
   right.appendChild(totalLabel);
   right.appendChild(totalVal);
 
-  // Combine left + right into final legend pane
   wrap.appendChild(left);
   wrap.appendChild(right);
   shiftLegendEl.appendChild(wrap);
-}
-
-function fmtMinutes(v) {
-  const n = Number(v);
-  if (!Number.isFinite(n)) return "—";
-  return `${Math.round(n * 10) / 10} min`; // 1 decimal
 }
 
 /* ---------- CSV ---------- */
@@ -1049,14 +910,14 @@ function downloadTextAsFile(filename, text, mime = "text/csv") {
   const a = document.createElement("a"); a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
-function fmtIsoLocalLabel(iso) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+function fmtIsoLocalLabel(x) {
+  const d = new Date(x);
+  if (Number.isNaN(d.getTime())) return String(x);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function buildOvenCsv() {
-  if (!lastOvenData) return "Note,No data loaded yet. Try Apply/Refresh while on network.\n";
+  if (!lastOvenData) return "Note,No data loaded yet.\n";
 
   const mode = chartViewEl?.value || "timeseries";
   const { buckets, sizes, series } = unpackSeries(lastOvenData);
@@ -1065,21 +926,23 @@ function buildOvenCsv() {
   const lines = [];
   lines.push(["GeneratedAt", new Date().toISOString()].map(csvEscape).join(","));
   lines.push(["RangeStart", lastOvenData.start ?? ""].map(csvEscape).join(","));
-  lines.push(["RangeEnd",   lastOvenData.end   ?? ""].map(csvEscape).join(","));
+  lines.push(["RangeEnd", lastOvenData.end ?? ""].map(csvEscape).join(","));
   lines.push(["ChartView", mode].map(csvEscape).join(","));
   lines.push("");
 
   lines.push("KPIs");
   lines.push(["FilledTotal", k?.filledTotal ?? ""].map(csvEscape).join(","));
-  lines.push(["EmptyTotal",  k?.emptyTotal  ?? ""].map(csvEscape).join(","));
+  lines.push(["EmptyTotal", k?.emptyTotal ?? ""].map(csvEscape).join(","));
   lines.push(["TotalCycles", k?.totalCycles ?? ""].map(csvEscape).join(","));
   lines.push(["EfficiencyPct", k?.efficiencyPct ?? ""].map(csvEscape).join(","));
   lines.push(["LostSeconds", k?.lostSeconds ?? ""].map(csvEscape).join(","));
+  lines.push(["LastCureMinutes", k?.lastCureMinutes ?? ""].map(csvEscape).join(","));
+  lines.push(["AvgCureMinutes", k?.avgCureMinutes ?? ""].map(csvEscape).join(","));
   lines.push("");
 
   if (mode === "timeseries") {
-    lines.push("TimeSeries_Buckets");
-    const header = ["BucketLocal", ...sizes.map((s) => `Size_${s}`), "Total"];
+    lines.push("Completions_TimeSeries_Buckets");
+    const header = ["BucketLocal", ...sizes.map(s => `Size_${s}`), "Total"];
     lines.push(header.map(csvEscape).join(","));
 
     for (let i = 0; i < buckets.length; i++) {
@@ -1087,29 +950,61 @@ function buildOvenCsv() {
       const row = [fmtIsoLocalLabel(buckets[i])];
       for (const s of sizes) {
         const v = Number(series[s]?.[i] || 0);
-        total += v; row.push(v);
+        total += v;
+        row.push(v);
       }
       row.push(total);
       lines.push(row.map(csvEscape).join(","));
     }
     lines.push("");
+
+  } else if (mode === "cureTimeseries") {
+    const cure = lastOvenData.cure;
+    const cb = Array.isArray(cure?.buckets) ? cure.buckets : [];
+    const cs = Array.isArray(cure?.sizes) ? cure.sizes : [];
+    const cseries = cure?.series || {};
+
+    lines.push("Cure_TimeSeries_Buckets");
+    const header = ["BucketLocal", ...cs.map(s => `Size_${s}`), "AllSizes_Avg"];
+    lines.push(header.map(csvEscape).join(","));
+
+    for (let i = 0; i < cb.length; i++) {
+      const row = [fmtIsoLocalLabel(cb[i])];
+
+      // per-size
+      const vals = [];
+      for (const s of cs) {
+        const v = cseries[s]?.[i];
+        row.push(v === null || v === undefined ? "" : Number(v));
+        if (v !== null && v !== undefined && Number.isFinite(Number(v))) vals.push(Number(v));
+      }
+
+      // all-sizes avg
+      const avg = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : "";
+      row.push(avg === "" ? "" : Math.round(avg * 10) / 10);
+
+      lines.push(row.map(csvEscape).join(","));
+    }
+    lines.push("");
+
   } else if (mode === "shiftType") {
     const g = computeTotalsByShiftTypeGrouped(buckets, sizes, series);
     lines.push("ShiftTotals_ByType_Grouped");
     lines.push(["Shift", ...g.sizeOrder.map(s => `Size_${s}`), "Total"].map(csvEscape).join(","));
     for (let i = 0; i < g.labels.length; i++) {
-      const row = [g.labels[i], ...g.sizeOrder.map(s => g.seriesMap[s][i]),
-        g.sizeOrder.reduce((t,s)=> t + (g.seriesMap[s][i] || 0), 0)];
+      const row = [g.labels[i], ...g.sizeOrder.map(s => g.seriesMap[s][i])];
+      row.push(g.sizeOrder.reduce((t, s) => t + (g.seriesMap[s][i] || 0), 0));
       lines.push(row.map(csvEscape).join(","));
     }
     lines.push("");
+
   } else {
     const g = computeTotalsByShiftInstanceGrouped(buckets, sizes, series);
     lines.push("ShiftTotals_ByInstance_Grouped");
     lines.push(["ShiftInstance", ...g.sizeOrder.map(s => `Size_${s}`), "Total"].map(csvEscape).join(","));
     for (let i = 0; i < g.labels.length; i++) {
-      const row = [g.labels[i], ...g.sizeOrder.map(s => g.seriesMap[s][i]),
-        g.sizeOrder.reduce((t,s)=> t + (g.seriesMap[s][i] || 0), 0)];
+      const row = [g.labels[i], ...g.sizeOrder.map(s => g.seriesMap[s][i])];
+      row.push(g.sizeOrder.reduce((t, s) => t + (g.seriesMap[s][i] || 0), 0));
       lines.push(row.map(csvEscape).join(","));
     }
     lines.push("");
@@ -1120,50 +1015,58 @@ function buildOvenCsv() {
 
 /* ---------- View controller ---------- */
 function setChartMode(mode) {
-  const isTime = mode === "timeseries";
-  timeseriesSection.style.display = isTime ? "block" : "none";
-  shiftBarsSection.style.display  = isTime ? "none"  : "block";
-  shiftCardsEl.style.display      = isTime ? "flex"  : "none";
+  const isTime = (mode === "timeseries" || mode === "cureTimeseries");
 
-  // Show TS size filter only for time series
-  if (tsSizeFilterEl && tsSizeFilterEl.parentElement) {
+  if (timeseriesSection) timeseriesSection.style.display = isTime ? "block" : "none";
+  if (shiftBarsSection) shiftBarsSection.style.display = isTime ? "none" : "block";
+
+  // Size selector should show for both time series views
+  if (tsSizeFilterEl?.parentElement) {
     tsSizeFilterEl.parentElement.style.display = isTime ? "block" : "none";
   }
+
+  // Shift cards only make sense for completions time series
+  if (shiftCardsEl) shiftCardsEl.style.display = (mode === "timeseries") ? "flex" : "none";
+
+  // Cure section only for cureTimeseries
+  if (cureSection) cureSection.style.display = (mode === "cureTimeseries") ? "block" : "none";
+
+  // Main completions canvas only for timeseries
+  if (canvas) canvas.style.display = (mode === "timeseries") ? "block" : "none";
+
+  // Legend only for timeseries (you can add one for cure if you want)
+  if (legendEl) legendEl.style.display = (mode === "timeseries") ? "flex" : "none";
 }
 
 function renderCurrentView() {
   if (!lastOvenData) return;
 
-  const { buckets, sizes, series } = unpackSeries(lastOvenData);
   const mode = chartViewEl?.value || "timeseries";
 
   if (mode === "timeseries") {
+    const { buckets, sizes, series } = unpackSeries(lastOvenData);
     ensureTsSizeOptions(sizes);
     const sel = tsSizeFilterEl?.value || "ALL";
     drawTimeSeriesSingle(buckets, sizes, series, sel);
     renderShiftCards(buckets, sizes, series);
+
+  } else if (mode === "cureTimeseries") {
+    const cure = lastOvenData.cure;
+    const cureSizes = Array.isArray(cure?.sizes) ? cure.sizes : [];
+    ensureTsSizeOptions(cureSizes.length ? cureSizes : (lastOvenData.sizes || []));
+    const sel = tsSizeFilterEl?.value || "ALL";
+    drawCureTimeSeries(cure, sel);
+
   } else if (mode === "shiftType") {
+    const { buckets, sizes, series } = unpackSeries(lastOvenData);
     const g = computeTotalsByShiftTypeGrouped(buckets, sizes, series);
-    const hint = "Shift totals by size";
-    drawGroupedBars(g.labels, g.seriesMap, g.sizeOrder, hint);
+    drawGroupedBars(g.labels, g.seriesMap, g.sizeOrder, "Shift totals by size");
+
   } else {
+    const { buckets, sizes, series } = unpackSeries(lastOvenData);
     const g = computeTotalsByShiftInstanceGrouped(buckets, sizes, series);
-    const hint = "Shift instances by size";
-    drawGroupedBars(g.labels, g.seriesMap, g.sizeOrder, hint);
+    drawGroupedBars(g.labels, g.seriesMap, g.sizeOrder, "Shift instances by size");
   }
-  if (mode === "timeseries") {
-  ensureTsSizeOptions(sizes);
-  const sel = tsSizeFilterEl?.value || "ALL";
-  drawTimeSeriesSingle(buckets, sizes, series, sel);
-  renderShiftCards(buckets, sizes, series);
-
-  // NEW: cure chart mirrors the same size selector
-  if (cureSection) cureSection.style.display = "block";
-  drawCureTimeSeries(lastOvenData.cure, sel);
-} else {
-  if (cureSection) cureSection.style.display = "none";
-}
-
 }
 
 /* ---------- Refresh ---------- */
@@ -1173,23 +1076,28 @@ async function refresh() {
     const data = await fetchData();
     lastOvenData = data;
     renderKpis(data.kpis);
+    setChartMode(chartViewEl?.value || "timeseries");
     renderCurrentView();
   } catch (e) {
     showError(e.message);
     renderKpis(null);
-    if (lastOvenData) renderCurrentView();
+    // If we had previous data, keep rendering something
+    if (lastOvenData) {
+      setChartMode(chartViewEl?.value || "timeseries");
+      renderCurrentView();
+    }
   }
 }
 
 function setRange(start, end) {
-  startEl.value = toLocalInputValue(start);
-  endEl.value = toLocalInputValue(end);
+  if (startEl) startEl.value = toLocalInputValue(start);
+  if (endEl) endEl.value = toLocalInputValue(end);
 }
 
 /* ---------- Controls ---------- */
-applyBtn.addEventListener("click", refresh);
+applyBtn?.addEventListener("click", refresh);
 
-todayBtn.addEventListener("click", () => {
+todayBtn?.addEventListener("click", () => {
   const { start, end } = todayProdDayRange();
   setRange(start, end);
   refresh();
@@ -1207,63 +1115,21 @@ lastWeekBtn?.addEventListener("click", () => {
   refresh();
 });
 
-// Set the inputs to the rolling last hour: [now - 1 hour, now]
-function setLastHourRangeAndRefresh() {
-  const now = new Date();
-  const start = new Date(now.getTime() - 60 * 60 * 1000); // 1 hour ago
-  setRange(start, now);
-  refresh();
-}
-
-// Start the live last-hour rolling mode.
-// freqMs: update frequency in milliseconds (default 15s)
-function startLiveLastHour(freqMs = 15000) {
-  if (liveHourActive) return;
-  liveHourActive = true;
-
-  // immediately set range & refresh
-  setLastHourRangeAndRefresh();
-
-  // clear any existing liveHourTimer just in case
-  if (liveHourTimer) {
-    clearInterval(liveHourTimer);
-    liveHourTimer = null;
-  }
-
-  // periodic updates (keeps range as [now-1h, now] and refreshes)
-  liveHourTimer = setInterval(() => {
-    setLastHourRangeAndRefresh();
-  }, freqMs);
-
-  // UI: highlight the button when active (toggle class)
-  if (lastHourBtn) lastHourBtn.classList.add("active");
-}
-
-function stopLiveLastHour() {
-  if (!liveHourActive) return;
-  liveHourActive = false;
-  if (liveHourTimer) {
-    clearInterval(liveHourTimer);
-    liveHourTimer = null;
-  }
-  if (lastHourBtn) lastHourBtn.classList.remove("active");
-}
-
-downloadCsvBtn?.addEventListener("click", () => {
-  const mode = chartViewEl?.value || "timeseries";
-  const stamp = new Date().toISOString().slice(0, 19).replaceAll(":", "-");
-  const filename = `oven_${mode}_ALL_${stamp}.csv`;
-  const csv = buildOvenCsv();
-  downloadTextAsFile(filename, csv);
-});
-
-shiftBtn.addEventListener("click", () => {
+shiftBtn?.addEventListener("click", () => {
   const { start, end } = currentShiftRange(new Date());
   setRange(start, end);
   refresh();
 });
 
-liveEl.addEventListener("change", () => {
+downloadCsvBtn?.addEventListener("click", () => {
+  const mode = chartViewEl?.value || "timeseries";
+  const stamp = new Date().toISOString().slice(0, 19).replaceAll(":", "-");
+  const filename = `oven_${mode}_${stamp}.csv`;
+  downloadTextAsFile(filename, buildOvenCsv());
+});
+
+liveEl?.addEventListener("change", () => {
+  if (!liveEl) return;
   if (liveEl.checked) {
     if (liveTimer) clearInterval(liveTimer);
     liveTimer = setInterval(refresh, 60000);
@@ -1273,13 +1139,35 @@ liveEl.addEventListener("change", () => {
   }
 });
 
-// toggle live last-hour mode
+// Rolling last hour helpers
+function setLastHourRangeAndRefresh() {
+  const now = new Date();
+  const start = new Date(now.getTime() - 60 * 60 * 1000);
+  setRange(start, now);
+  refresh();
+}
+function startLiveLastHour(freqMs = 60000) {
+  if (liveHourActive) return;
+  liveHourActive = true;
+
+  setLastHourRangeAndRefresh();
+
+  if (liveHourTimer) clearInterval(liveHourTimer);
+  liveHourTimer = setInterval(setLastHourRangeAndRefresh, freqMs);
+
+  lastHourBtn?.classList.add("active");
+}
+function stopLiveLastHour() {
+  if (!liveHourActive) return;
+  liveHourActive = false;
+  if (liveHourTimer) clearInterval(liveHourTimer);
+  liveHourTimer = null;
+  lastHourBtn?.classList.remove("active");
+}
+
 lastHourBtn?.addEventListener("click", () => {
   if (!liveHourActive) {
-    // turn off the global "live" (if you prefer them mutually exclusive)
-    // if (liveEl && liveEl.checked) { liveEl.checked = false; if (liveTimer) { clearInterval(liveTimer); liveTimer = null; } }
-
-    startLiveLastHour(60000); // update every 60 seconds
+    startLiveLastHour(60000);
     lastHourBtn.textContent = "Last Production Hour (live) — ON";
   } else {
     stopLiveLastHour();
@@ -1287,9 +1175,9 @@ lastHourBtn?.addEventListener("click", () => {
   }
 });
 
+// Stop rolling mode if user edits start/end manually
 [startEl, endEl].forEach(el => {
-  if (!el) return;
-  el.addEventListener("input", () => {
+  el?.addEventListener("input", () => {
     if (liveHourActive) {
       stopLiveLastHour();
       if (lastHourBtn) lastHourBtn.textContent = "Last Production Hour (live)";
@@ -1297,21 +1185,21 @@ lastHourBtn?.addEventListener("click", () => {
   });
 });
 
-
 // View changes
-chartViewEl.addEventListener("change", () => {
+chartViewEl?.addEventListener("change", () => {
   setChartMode(chartViewEl.value);
   renderCurrentView();
 });
 
-// Time Series size selector
+// Size selector changes
 tsSizeFilterEl?.addEventListener("change", renderCurrentView);
 
 /* ---------- Init ---------- */
 (function init() {
-  // Default to today's production day window (21:00 -> 21:00)
+  // default to today's production day window
   const { start, end } = todayProdDayRange();
   setRange(start, end);
+
   setChartMode(chartViewEl?.value || "timeseries");
   refresh();
 })();
