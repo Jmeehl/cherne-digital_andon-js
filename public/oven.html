@@ -54,6 +54,13 @@
   </style>
 </head>
 
+<section class="panel" id="cureSection">
+  <h2>Avg Cure Time (5 min buckets)</h2>
+  <canvas id="cureChart" width="1200" height="360"></canvas>
+  <div class="muted">Goal range: 45–120 minutes</div>
+</section>
+
+
 <body>
   <div id="topnav"></div>
 
@@ -87,17 +94,7 @@
           <option value="timeseries" selected>Time Series (5 min)</option>
           <option value="shiftType">Shift Totals (1st/2nd/3rd)</option>
           <option value="shiftInstance">Shift Instances (Day + Shift)</option>
-        </select>
-      </div>
-
-      <div>
-        <label for="shiftSizeFilter">Shift Chart Size</label>
-        <select id="shiftSizeFilter">
-          <option value="ALL" selected>All Sizes</option>
-          <option value="1">Size 1</option>
-          <option value="2">Size 2</option>
-          <option value="3">Size 3</option>
-          <option value="4">Size 4</option>
+          <option value="cureTimeseries">Cure Time (Avg)</option>
         </select>
       </div>
 
@@ -115,6 +112,8 @@
         Live (refresh 60s)
       </label>
       <button class="btn" id="lastWeekBtn" type="button">Last Week</button>
+      <button id="lastHourBtn" class="btn secondary" title="Rolling last 60 minutes (live)">Last Production Hour (live)</button>
+
     </div>
     
 

@@ -51,6 +51,7 @@ export async function getPool() {
 }
 
 // Latest mold status per MoldNumber (your existing logic)
+// molds_sql.js
 export async function fetchLatestMolds() {
   const pool = await getPool();
   const result = await pool.request().query(`
@@ -63,11 +64,12 @@ export async function fetchLatestMolds() {
         Extract_DateTime,
         MoldClose_DateTime,
         ROW_NUMBER() OVER (
-          PARTITION BY MoldNumber
+          PARTITION BY MoldSize, MoldNumber
           ORDER BY Extract_DateTime DESC, MoldClose_DateTime DESC
         ) AS rn
       FROM dbo.MoldData
       WHERE MoldNumber IS NOT NULL
+        AND MoldSize IS NOT NULL
     )
     SELECT
       MoldNumber,
@@ -80,6 +82,61 @@ export async function fetchLatestMolds() {
     WHERE rn = 1;
   `);
   return Array.isArray(result.recordset) ? result.recordset : [];
+}
+
+// Cure KPIs for a range (filled only):
+// - last cure minutes (most recent extract in range)
+// - average cure minutes across range
+export async function fetchOvenCureKpis({ startDate, endDate }) {
+  const pool = await getPool();
+
+  const result = await pool.request()
+    .input("start", sql.DateTime2, startDate)
+    .input("end",   sql.DateTime2, endDate)
+    .query(`
+      ;WITH base AS (
+        SELECT
+          MoldNumber,
+          MoldClose_DateTime,
+          Extract_DateTime,
+          Plug_Present_In_Mold,
+          ROW_NUMBER() OVER (
+            PARTITION BY MoldNumber, Extract_DateTime
+            ORDER BY Extract_DateTime DESC
+          ) AS rn
+        FROM dbo.MoldData
+        WHERE
+          Extract_DateTime IS NOT NULL
+          AND Extract_DateTime >= @start
+          AND Extract_DateTime <  @end
+          AND Plug_Present_In_Mold = 1
+      ),
+      events AS (
+        SELECT
+          Extract_DateTime,
+          CASE
+            WHEN MoldClose_DateTime IS NOT NULL
+             AND Extract_DateTime >= MoldClose_DateTime
+            THEN DATEDIFF(second, MoldClose_DateTime, Extract_DateTime) / 60.0
+            ELSE NULL
+          END AS CureMinutes
+        FROM base
+        WHERE rn = 1
+      )
+      SELECT
+        (SELECT TOP 1 CureMinutes
+         FROM events
+         WHERE CureMinutes IS NOT NULL
+         ORDER BY Extract_DateTime DESC) AS LastCureMinutes,
+        AVG(CureMinutes) AS AvgCureMinutes
+      FROM events;
+    `);
+
+  const row = Array.isArray(result.recordset) ? result.recordset[0] : null;
+  return {
+    lastCureMinutes: row?.LastCureMinutes ?? null,
+    avgCureMinutes: row?.AvgCureMinutes ?? null
+  };
 }
 
 // Counts completed molds per hour by MoldSize where Plug_Present_In_Mold = 1

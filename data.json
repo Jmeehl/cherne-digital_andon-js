@@ -728,6 +728,27 @@
             "completedBy": "Hollis Fritts",
             "result": "Resolved",
             "solutionNote": "teset"
+          },
+          {
+            "ticketId": "mnt_1770847519758_66a90b68",
+            "status": "COMPLETED",
+            "createdAt": 1770847519758,
+            "priority": "Medium",
+            "issue": "Y axis scale",
+            "assetLabel": "MILLTAP 700",
+            "progressStatus": "In progress",
+            "fiix": {
+              "workOrderId": 156521724,
+              "workOrderNumber": "98034",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "Y axis scale",
+              "requestPriority": "Medium",
+              "requestAsset": "MILLTAP 700"
+            },
+            "completedAt": 1770847558549,
+            "completedBy": "Daniel Wellens",
+            "result": "Resolved",
+            "solutionNote": "Replaced Y scale"
           }
         ]
       },

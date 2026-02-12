@@ -8,11 +8,12 @@ import fs from "fs";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
 import { Server } from "socket.io";
-import { fetchOvenFillStats } from "./molds_sql.js";
 
 import {
   fetchLatestMolds,
   fetchPlugPerformanceByHour,
+  fetchOvenCureKpis,
+  fetchOvenFillStats,
   fetchOvenRealtime
 } from "./molds_sql.js";
 
@@ -1019,6 +1020,51 @@ app.get("/api/oven/plug-performance", async (req, res) => {
       : null;
 
     const lostSeconds = emptyTotal * 15;
+    const cure = await fetchOvenCureKpis({ startDate: startB, endDate: new Date(endB.getTime() + bucketMs) });
+
+    const { rows: cureRows } = await fetchOvenRealtime({
+    startDate: startB,
+    endDate: new Date(endB.getTime() + bucketMs),
+    bucketMinutes: 5
+    });
+
+    // Build bucket list
+const cureBucketSet = new Set();
+const cureSizeSet = new Set();
+for (const r of cureRows) {
+  cureBucketSet.add(new Date(r.BucketTime).toISOString());
+  cureSizeSet.add(String(r.PlugSize));
+}
+const cureBuckets = Array.from(cureBucketSet).sort();
+const cureSizes = Array.from(cureSizeSet).sort((a,b)=>Number(a)-Number(b));
+
+// Map: size -> bucket -> avg
+const cureMap = {};
+for (const s of cureSizes) cureMap[s] = Object.create(null);
+
+for (const r of cureRows) {
+  const b = new Date(r.BucketTime).toISOString();
+  const s = String(r.PlugSize);
+  cureMap[s][b] = (r.AvgBakeMinutes === null || r.AvgBakeMinutes === undefined)
+    ? null
+    : Number(r.AvgBakeMinutes);
+}
+
+// Build aligned arrays for each size
+const cureSeries = {};
+for (const s of cureSizes) {
+  cureSeries[s] = cureBuckets.map((b) => cureMap[s][b] ?? null);
+}
+res.json({
+  ok: true,
+  start: startB.toISOString(),
+  end: endB.toISOString(),
+  buckets, sizes, series, kpis,          // existing
+  cure: { buckets: cureBuckets, sizes: cureSizes, series: cureSeries }
+});
+
+
+
 
     res.json({
       ok: true,
@@ -1034,7 +1080,9 @@ app.get("/api/oven/plug-performance", async (req, res) => {
         emptyTotal,
         totalCycles,
         efficiencyPct,
-        lostSeconds
+        lostSeconds,
+        lastCureMinutes: cure.lastCureMinutes,
+        avgCureMinutes: cure.avgCureMinutes
       }
     });
   } catch (e) {
@@ -1493,5 +1541,9 @@ app.get("/dashboard/:dept", (req, res) => res.sendFile(path.join(__dirname, "pub
 app.get("/history/:dept", (req, res) => res.sendFile(path.join(__dirname, "public", "history.html")));
 app.get("/cell/:id", (req, res) => res.sendFile(path.join(__dirname, "public", "cell.html")));
 
-const PORT = process.env.PORT ?? 3000;
-server.listen(PORT, () => console.log(`Running on http://localhost:${PORT}`));
+//const PORT = process.env.PORT ?? 3000;
+//server.listen(PORT, () => console.log(`Running on http://localhost:${PORT}`));
+
+const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || "10.12.1.75";
+server.listen(PORT, HOST, () => console.log(`Listening on http://${HOST}:${PORT}`));

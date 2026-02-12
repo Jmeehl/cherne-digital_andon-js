@@ -9,9 +9,10 @@
 // Quick ranges:
 // - Today  : production day (yesterday 21:00 -> today 21:00)
 // - Yesterday: production day (two days ago 21:00 -> yesterday 21:00)
-// - Last Week: 7 production days ending today 21:00
+// - Last Week: previous calendar week (Sunday 00:00 -> Sunday 00:00)
+
 //
-// This file matches your existing HTML IDs and control layout.
+// This file matches the existing HTML IDs and control layout.
 // (Based on your latest oven.js structure.)
 // ---------------------------------------------------------------------------
 
@@ -25,10 +26,10 @@ const shiftBtn = document.getElementById("shiftBtn");
 const last8Btn = document.getElementById("last8Btn");
 const yesterdayBtn = document.getElementById("yesterdayBtn");
 const lastWeekBtn = document.getElementById("lastWeekBtn");
+const lastHourBtn = document.getElementById("lastHourBtn");
 const liveEl = document.getElementById("live");
 
 const chartViewEl = document.getElementById("chartView");
-const shiftSizeFilterEl = document.getElementById("shiftSizeFilter"); // bar-mode filter now disabled
 const tsSizeFilterEl = document.getElementById("tsSizeFilter");        // NEW: time-series size selector
 
 const timeseriesSection = document.getElementById("timeseriesSection");
@@ -43,10 +44,18 @@ const errorEl = document.getElementById("error");
 
 const shiftCardsEl = document.getElementById("shiftCards");
 const kpiCardsEl = document.getElementById("kpiCards");
+const cureCanvas = document.getElementById("cureChart");
+const cureSection = document.getElementById("cureSection");
+
 
 /* ---------- State ---------- */
 let liveTimer = null;
 let lastOvenData = null;
+
+// timer specifically for "last production hour" live mode
+let liveHourTimer = null;
+let liveHourActive = false;
+
 
 /* ---------- Constants ---------- */
 const COLORS = ["#0066cc", "#cc3300", "#2e7d32", "#6a1b9a", "#ff8f00", "#00838f"];
@@ -151,11 +160,23 @@ function todayProdDayRange() {
 function yesterdayProdDayRange() {
   const y = new Date(); y.setDate(y.getDate() - 1); return prodDayRangeFor(y);
 }
-function lastWeekProdDayRange() {
-  const { end } = todayProdDayRange();
-  const start = new Date(end); start.setDate(start.getDate() - 7);
+// Previous calendar week: Sunday 00:00 -> following Sunday 00:00 (local time)
+function previousWeekSundayToSundayRange(now = new Date()) {
+  // Start of *this* week (Sunday 00:00 local)
+  const startOfThisWeek = new Date(now);
+  startOfThisWeek.setHours(0, 0, 0, 0);
+  startOfThisWeek.setDate(startOfThisWeek.getDate() - startOfThisWeek.getDay()); // getDay(): 0=Sun
+
+  // Previous week Sunday 00:00
+  const start = new Date(startOfThisWeek);
+  start.setDate(start.getDate() - 7);
+
+  // End = this week Sunday 00:00
+  const end = startOfThisWeek;
+
   return { start, end };
 }
+
 
 /* ---------- Fetch (LOCAL params) ----------
    The server's parseRange(req) prefers startLocal/endLocal (YYYY-MM-DDTHH:mm).
@@ -221,6 +242,9 @@ function renderKpis(kpis) {
   const filled = Number(kpis?.filledTotal);
   const empty = Number(kpis?.emptyTotal);
   const total = Number(kpis?.totalCycles);
+  const lastCure = fmtMinutes(kpis?.lastCureMinutes);
+  const avgCure  = fmtMinutes(kpis?.avgCureMinutes);
+
 
   const eff = (kpis?.efficiencyPct === null || kpis?.efficiencyPct === undefined)
     ? "—" : `${kpis.efficiencyPct}%`;
@@ -259,16 +283,15 @@ function renderKpis(kpis) {
     </div>
 
     <div class="card">
-      <h3>Empty Rate</h3>
-      <div class="muted">${emptyRate}</div>
-      <div class="muted" style="margin-top:6px;">Empty / Total</div>
-      <div class="muted">${emptyDisp} / ${totalDisp}</div>
+      <h3>Last Cure Time</h3>
+     <div class="muted">${lastCure}</div>
+     <div class="muted" style="margin-top:6px;">Extract − Mold Close</div>
     </div>
 
     <div class="card">
-      <h3>Total Cycles</h3>
-      <div class="muted">${totalDisp}</div>
-      <div class="muted" style="margin-top:6px;">(Filled + Empty)</div>
+      <h3>Avg Cure Time</h3>
+      <div class="muted">${avgCure}</div>
+      <div class="muted" style="margin-top:6px;">Filled cycles in range</div>
     </div>
   `;
 }
@@ -322,6 +345,157 @@ function getTsLine(buckets, sizes, series, sel) {
   const line = buckets.map((_, i) => Number(data[i] || 0));
   return { line, label: `Size ${sel}` };
 }
+
+function drawCureTimeSeries(cure, selSize = "ALL") {
+  if (!cureCanvas || !cure?.buckets?.length) return;
+
+  const buckets = cure.buckets;
+  const sizes = cure.sizes || [];
+  const series = cure.series || {};
+
+  // Build the line: either ALL sizes (avg of non-null avgs) or one size
+  let line = [];
+  let label = "All sizes";
+
+  if (selSize !== "ALL") {
+    label = `Size ${selSize}`;
+    line = buckets.map((_, i) => {
+      const v = series[selSize]?.[i];
+      return (v === null || v === undefined) ? null : Number(v);
+    });
+  } else {
+    line = buckets.map((_, i) => {
+      const vals = sizes
+        .map(s => series[s]?.[i])
+        .filter(v => v !== null && v !== undefined && Number.isFinite(Number(v)))
+        .map(Number);
+      if (!vals.length) return null;
+      return vals.reduce((a,b)=>a+b,0) / vals.length;
+    });
+  }
+
+  const ctx = cureCanvas.getContext("2d");
+  const W = cureCanvas.width, H = cureCanvas.height;
+  const padL = 60, padR = 20, padT = 18, padB = 44;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const N = buckets.length;
+
+  // Y scaling: include goalposts so lines are always visible
+  const LOW = 45;
+  const HIGH = 120;
+  let maxY = Math.max(HIGH, 5);
+  let minY = Math.min(LOW, 0);
+
+  for (const v of line) {
+    if (v === null || v === undefined) continue;
+    const n = Number(v);
+    if (!Number.isFinite(n)) continue;
+    maxY = Math.max(maxY, n);
+    minY = Math.min(minY, n);
+  }
+  // add headroom
+  maxY = Math.ceil(maxY * 1.10);
+  minY = Math.floor(Math.max(0, minY - 5));
+
+  function yFor(val) {
+    const t = (val - minY) / (maxY - minY || 1);
+    return padT + plotH - (plotH * t);
+  }
+  function xFor(i) {
+    return padL + plotW * (N === 1 ? 0 : i / (N - 1));
+  }
+
+  // background
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = isDark() ? "#0f1419" : "#ffffff";
+  ctx.fillRect(0, 0, W, H);
+
+  // grid
+  ctx.strokeStyle = isDark() ? "rgba(255,255,255,0.10)" : "#e6e6e6";
+  ctx.lineWidth = 1;
+  const gridLines = 5;
+  for (let i = 0; i <= gridLines; i++) {
+    const y = padT + (plotH * i / gridLines);
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
+  }
+
+  // axes
+  ctx.strokeStyle = isDark() ? "rgba(255,255,255,0.35)" : "#333";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(padL, padT);
+  ctx.lineTo(padL, padT + plotH);
+  ctx.lineTo(padL + plotW, padT + plotH);
+  ctx.stroke();
+
+  // Y labels
+  ctx.fillStyle = isDark() ? "#e6e8ea" : "#333";
+  ctx.font = "12px sans-serif";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  for (let i = 0; i <= gridLines; i++) {
+    const val = Math.round(maxY - (maxY - minY) * (i / gridLines));
+    const y = padT + (plotH * i / gridLines);
+    ctx.fillText(String(val), padL - 8, y);
+  }
+
+  // X labels
+  const step = Math.max(1, Math.floor(N / 12));
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  for (let i = 0; i < N; i += step) {
+    const x = xFor(i);
+    const d = new Date(buckets[i]);
+    ctx.fillText(`${pad(d.getHours())}:${pad(d.getMinutes())}`, x, padT + plotH + 10);
+  }
+
+  // goalpost lines
+  ctx.save();
+  ctx.setLineDash([6, 6]);
+  ctx.lineWidth = 2;
+
+  // low (45)
+  ctx.strokeStyle = isDark() ? "rgba(0,255,0,0.55)" : "rgba(0,160,0,0.65)";
+  ctx.beginPath();
+  ctx.moveTo(padL, yFor(LOW));
+  ctx.lineTo(padL + plotW, yFor(LOW));
+  ctx.stroke();
+
+  // high (120)
+  ctx.strokeStyle = isDark() ? "rgba(255,165,0,0.55)" : "rgba(220,120,0,0.70)";
+  ctx.beginPath();
+  ctx.moveTo(padL, yFor(HIGH));
+  ctx.lineTo(padL + plotW, yFor(HIGH));
+  ctx.stroke();
+  ctx.restore();
+
+  // cure line (skip null gaps)
+  ctx.strokeStyle = COLORS[0];
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  let started = false;
+  for (let i = 0; i < N; i++) {
+    const v = line[i];
+    if (v === null || v === undefined || !Number.isFinite(Number(v))) {
+      started = false;
+      continue;
+    }
+    const x = xFor(i);
+    const y = yFor(Number(v));
+    if (!started) { ctx.moveTo(x, y); started = true; }
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // title label (simple)
+  ctx.fillStyle = isDark() ? "#e6e8ea" : "#333";
+  ctx.font = "13px sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.fillText(`Avg Cure Time — ${label}`, padL, 6);
+}
+
 
 function buildTimeSeriesLegendSingle(label) {
   legendEl.innerHTML = "";
@@ -858,6 +1032,11 @@ function drawGroupedBars(labels, seriesMap, sizeOrder, hintText) {
   shiftLegendEl.appendChild(wrap);
 }
 
+function fmtMinutes(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  return `${Math.round(n * 10) / 10} min`; // 1 decimal
+}
 
 /* ---------- CSV ---------- */
 function csvEscape(v) {
@@ -946,9 +1125,6 @@ function setChartMode(mode) {
   shiftBarsSection.style.display  = isTime ? "none"  : "block";
   shiftCardsEl.style.display      = isTime ? "flex"  : "none";
 
-  // Bar modes always include all sizes now, so bar-size filter is disabled.
-  if (shiftSizeFilterEl) shiftSizeFilterEl.disabled = true;
-
   // Show TS size filter only for time series
   if (tsSizeFilterEl && tsSizeFilterEl.parentElement) {
     tsSizeFilterEl.parentElement.style.display = isTime ? "block" : "none";
@@ -975,6 +1151,19 @@ function renderCurrentView() {
     const hint = "Shift instances by size";
     drawGroupedBars(g.labels, g.seriesMap, g.sizeOrder, hint);
   }
+  if (mode === "timeseries") {
+  ensureTsSizeOptions(sizes);
+  const sel = tsSizeFilterEl?.value || "ALL";
+  drawTimeSeriesSingle(buckets, sizes, series, sel);
+  renderShiftCards(buckets, sizes, series);
+
+  // NEW: cure chart mirrors the same size selector
+  if (cureSection) cureSection.style.display = "block";
+  drawCureTimeSeries(lastOvenData.cure, sel);
+} else {
+  if (cureSection) cureSection.style.display = "none";
+}
+
 }
 
 /* ---------- Refresh ---------- */
@@ -1013,10 +1202,52 @@ yesterdayBtn?.addEventListener("click", () => {
 });
 
 lastWeekBtn?.addEventListener("click", () => {
-  const { start, end } = lastWeekProdDayRange();
+  const { start, end } = previousWeekSundayToSundayRange(new Date());
   setRange(start, end);
   refresh();
 });
+
+// Set the inputs to the rolling last hour: [now - 1 hour, now]
+function setLastHourRangeAndRefresh() {
+  const now = new Date();
+  const start = new Date(now.getTime() - 60 * 60 * 1000); // 1 hour ago
+  setRange(start, now);
+  refresh();
+}
+
+// Start the live last-hour rolling mode.
+// freqMs: update frequency in milliseconds (default 15s)
+function startLiveLastHour(freqMs = 15000) {
+  if (liveHourActive) return;
+  liveHourActive = true;
+
+  // immediately set range & refresh
+  setLastHourRangeAndRefresh();
+
+  // clear any existing liveHourTimer just in case
+  if (liveHourTimer) {
+    clearInterval(liveHourTimer);
+    liveHourTimer = null;
+  }
+
+  // periodic updates (keeps range as [now-1h, now] and refreshes)
+  liveHourTimer = setInterval(() => {
+    setLastHourRangeAndRefresh();
+  }, freqMs);
+
+  // UI: highlight the button when active (toggle class)
+  if (lastHourBtn) lastHourBtn.classList.add("active");
+}
+
+function stopLiveLastHour() {
+  if (!liveHourActive) return;
+  liveHourActive = false;
+  if (liveHourTimer) {
+    clearInterval(liveHourTimer);
+    liveHourTimer = null;
+  }
+  if (lastHourBtn) lastHourBtn.classList.remove("active");
+}
 
 downloadCsvBtn?.addEventListener("click", () => {
   const mode = chartViewEl?.value || "timeseries";
@@ -1041,6 +1272,31 @@ liveEl.addEventListener("change", () => {
     liveTimer = null;
   }
 });
+
+// toggle live last-hour mode
+lastHourBtn?.addEventListener("click", () => {
+  if (!liveHourActive) {
+    // turn off the global "live" (if you prefer them mutually exclusive)
+    // if (liveEl && liveEl.checked) { liveEl.checked = false; if (liveTimer) { clearInterval(liveTimer); liveTimer = null; } }
+
+    startLiveLastHour(60000); // update every 60 seconds
+    lastHourBtn.textContent = "Last Production Hour (live) — ON";
+  } else {
+    stopLiveLastHour();
+    lastHourBtn.textContent = "Last Production Hour (live)";
+  }
+});
+
+[startEl, endEl].forEach(el => {
+  if (!el) return;
+  el.addEventListener("input", () => {
+    if (liveHourActive) {
+      stopLiveLastHour();
+      if (lastHourBtn) lastHourBtn.textContent = "Last Production Hour (live)";
+    }
+  });
+});
+
 
 // View changes
 chartViewEl.addEventListener("change", () => {
