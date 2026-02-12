@@ -945,18 +945,16 @@ function parseRange(req) {
 
 // Hourly chart (date range)
 // 5-minute bucket chart with continuous timeline + zero-filled gaps.
-// Uses fetchOvenRealtime() which returns BucketTime, PlugSize, CloseCount. [2](https://oateyscs-my.sharepoint.com/personal/jmeehl_oatey_com/Documents/Microsoft%20Copilot%20Chat%20Files/molds.html)
-// 5-minute bucket chart with continuous timeline + zero-filled gaps.
-// Adds KPIs: efficiency + time loss from empty molds.
+// Adds KPIs: efficiency + time loss from empty molds + cure time KPIs.
+// Also returns cure time series (AvgBakeMinutes) aligned to the same bucket timeline.
 app.get("/api/oven/plug-performance", async (req, res) => {
   try {
-    // const { start, end } = parseRange(req);
     const { start, end } = parseRange(req);
 
     const bucketMinutes = 5;
     const bucketMs = bucketMinutes * 60 * 1000;
 
-    // ✅ Floor timestamps to 5-min boundaries in LOCAL time
+    // Floor timestamps to 5-min boundaries in LOCAL time
     const floorToBucketLocal = (d) => {
       const x = new Date(d);
       const mins = x.getMinutes();
@@ -968,7 +966,7 @@ app.get("/api/oven/plug-performance", async (req, res) => {
     const startB = floorToBucketLocal(start);
     const endB = floorToBucketLocal(end);
 
-    // ✅ Build continuous buckets as epoch milliseconds (numbers)
+    // Build continuous buckets as epoch milliseconds (numbers)
     const buckets = [];
     for (let t = startB.getTime(); t <= endB.getTime(); t += bucketMs) {
       buckets.push(t);
@@ -993,7 +991,6 @@ app.get("/api/oven/plug-performance", async (req, res) => {
     let emptyTotal = 0;
 
     for (const r of rows) {
-      // BucketTime coming from SQL is a Date; normalize to local bucket ms
       const b = floorToBucketLocal(r.BucketTime).getTime();
       const s = String(r.PlugSize);
       const cnt = Number(r.Cnt) || 0;
@@ -1007,7 +1004,7 @@ app.get("/api/oven/plug-performance", async (req, res) => {
       }
     }
 
-    // Series aligned to continuous buckets (zero-filled)
+    // Completions series aligned to continuous buckets (zero-filled)
     const series = {};
     for (const s of sizes) {
       series[s] = buckets.map((b) => filledMap.get(`${b}|${s}`) ?? 0);
@@ -1019,76 +1016,67 @@ app.get("/api/oven/plug-performance", async (req, res) => {
       ? Math.round((filledTotal / totalCycles) * 1000) / 10
       : null;
 
-            const lostSeconds = emptyTotal * 15;
-    const kpis = {
-      filledTotal,
-      emptyTotal,
-      totalCycles,
-      efficiencyPct,
-      lostSeconds
-    };
+    const lostSeconds = emptyTotal * 15;
 
-    // cure KPIs (last/avg cure minutes)
     const cureKpis = await fetchOvenCureKpis({
       startDate: startB,
       endDate: new Date(endB.getTime() + bucketMs)
     });
 
-    kpis.lastCureMinutes = cureKpis?.lastCureMinutes ?? null;
-    kpis.avgCureMinutes = cureKpis?.avgCureMinutes ?? null;
+    const kpis = {
+      filledTotal,
+      emptyTotal,
+      totalCycles,
+      efficiencyPct,
+      lostSeconds,
+      lastCureMinutes: cureKpis?.lastCureMinutes ?? null,
+      avgCureMinutes: cureKpis?.avgCureMinutes ?? null
+    };
 
-    // cure timeseries per 5-min bucket
+    // Cure time series per 5-min bucket (AvgBakeMinutes), aligned to SAME numeric buckets
     const { rows: cureRows } = await fetchOvenRealtime({
       startDate: startB,
       endDate: new Date(endB.getTime() + bucketMs),
-      bucketMinutes: 5
+      bucketMinutes
     });
 
-    const cureBucketSet = new Set();
-    const cureSizeSet = new Set();
-
+    const cureAvgMap = new Map(); // key: bucketMs|size -> AvgBakeMinutes
     for (const r of (cureRows || [])) {
-      cureBucketSet.add(new Date(r.BucketTime).toISOString());
-      cureSizeSet.add(String(r.PlugSize));
-    }
-
-    const cureBuckets = Array.from(cureBucketSet).sort();
-    const cureSizes = Array.from(cureSizeSet).sort((a, b) => Number(a) - Number(b));
-
-    const cureMap = {};
-    for (const s of cureSizes) cureMap[s] = Object.create(null);
-
-    for (const r of (cureRows || [])) {
-      const b = new Date(r.BucketTime).toISOString();
+      const b = floorToBucketLocal(r.BucketTime).getTime();
       const s = String(r.PlugSize);
-      cureMap[s][b] =
-        (r.AvgBakeMinutes === null || r.AvgBakeMinutes === undefined)
-          ? null
-          : Number(r.AvgBakeMinutes);
+
+      const v = r.AvgBakeMinutes;
+      if (v === null || v === undefined) continue;
+      const n = Number(v);
+      if (!Number.isFinite(n)) continue;
+
+      cureAvgMap.set(`${b}|${s}`, n);
     }
 
     const cureSeries = {};
-    for (const s of cureSizes) {
-      cureSeries[s] = cureBuckets.map((b) => cureMap[s][b] ?? null);
+    for (const s of sizes) {
+      cureSeries[s] = buckets.map((b) => {
+        const v = cureAvgMap.get(`${b}|${s}`);
+        return (v === undefined) ? null : v; // null = missing
+      });
     }
 
-    // ✅ single response
     res.json({
       ok: true,
       start: startB.toISOString(),
       end: endB.toISOString(),
       bucketMinutes,
-      buckets,  // numeric ms
+      buckets, // numeric ms
       sizes,
       series,
       kpis,
-      cure: {
-        buckets: cureBuckets,
-        sizes: cureSizes,
-        series: cureSeries
-      }
+      cure: { buckets, sizes, series: cureSeries }
     });
-
+  } catch (e) {
+    // parseRange throws for bad inputs -> 400
+    res.status(400).json({ ok: false, error: e?.message ?? String(e) });
+  }
+});
 
 // --------------------
 // Mold APIs + page
