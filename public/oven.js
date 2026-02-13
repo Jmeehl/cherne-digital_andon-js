@@ -425,20 +425,31 @@ function drawTimeSeriesSingle(buckets, sizes, series, sel) {
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
   const N = buckets.length;
+  
+  let maxY = 0;
+  for (const v of line) maxY = Math.max(maxY, v);
+  maxY = Math.max(5, Math.ceil(maxY * 1.15));
 
-  // ---- Shift boundary markers (05:00 / 13:00 / 21:00) ----
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = isDark() ? "#0f1419" : "#ffffff";
+  ctx.fillRect(0, 0, W, H);
+
+  const stoppedMask = computeStoppedMask(sizes, series, N);
+  const runs = shadeStopped(ctx, stoppedMask, padL, padT, plotW, plotH, N);
+
+    // ---- Shift boundary markers (05:00 / 13:00 / 21:00) ----
   if (N >= 2) {
   ctx.save();
 
   // line style
-  ctx.strokeStyle = isDark() ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.14)";
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = isDark() ? "rgba(247, 236, 236, 0.18)" : "rgba(228, 210, 210, 0.14)";
+  ctx.lineWidth = 3;
 
   // label style (optional)
-  ctx.fillStyle = isDark() ? "rgba(255,255,255,0.65)" : "rgba(0,0,0,0.55)";
+  ctx.fillStyle = isDark() ? "rgba(20, 18, 18, 0.65)" : "rgba(22, 20, 20, 0.55)";
   ctx.font = "11px sans-serif";
   ctx.textAlign = "center";
-  ctx.textBaseline = "top";
+  ctx.textBaseline = "middle";
 
   const xFor = (i) => padL + plotW * (N === 1 ? 0 : i / (N - 1));
 
@@ -461,17 +472,6 @@ function drawTimeSeriesSingle(buckets, sizes, series, sel) {
 
   ctx.restore();
   }
-  
-  let maxY = 0;
-  for (const v of line) maxY = Math.max(maxY, v);
-  maxY = Math.max(5, Math.ceil(maxY * 1.15));
-
-  ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = isDark() ? "#0f1419" : "#ffffff";
-  ctx.fillRect(0, 0, W, H);
-
-  const stoppedMask = computeStoppedMask(sizes, series, N);
-  const runs = shadeStopped(ctx, stoppedMask, padL, padT, plotW, plotH, N);
 
   // Label each shaded run with its duration
   // Label each shaded run with its duration (dynamic sizing + vertical fallback)
