@@ -48,6 +48,7 @@ const cureCanvas = document.getElementById("cureChart");
 /* ---------- State ---------- */
 let liveTimer = null;
 let lastOvenData = null;
+let hoverTsIndex = null;
 
 // Last hour live mode
 let liveHourTimer = null;
@@ -76,6 +77,14 @@ function showError(msg) {
   if (!errorEl) return;
   errorEl.style.display = msg ? "block" : "none";
   errorEl.textContent = msg || "";
+}
+
+function fmtDowntimeMinutes(mins) {
+  if (!Number.isFinite(mins) || mins <= 0) return "0m";
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m ? `${h}h ${m}m` : `${h}h`;
 }
 
 function fmtDuration(seconds) {
@@ -375,25 +384,35 @@ function computeStoppedMask(sizes, series, N) {
 }
 
 function shadeStopped(ctx, mask, padL, padT, plotW, plotH, N) {
-  if (N < 2) return;
+  const runs = [];
+  if (N < 2) return runs;
+
   const stepPx = plotW / (N - 1);
   const xFor = (i) => padL + plotW * (i / (N - 1));
 
   ctx.save();
   ctx.fillStyle = isDark() ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.07)";
+
   let i = 0;
   while (i < N) {
     if (!mask[i]) { i++; continue; }
-    let j = i; while (j + 1 < N && mask[j + 1]) j++;
+
+    let j = i;
+    while (j + 1 < N && mask[j + 1]) j++;
+
     const runLen = (j - i + 1);
     if (runLen >= SHADE_AFTER_EMPTY_BUCKETS) {
       const x0 = Math.max(padL, xFor(i) - stepPx / 2);
       const x1 = Math.min(padL + plotW, xFor(j) + stepPx / 2);
       ctx.fillRect(x0, padT, x1 - x0, plotH);
+      runs.push({ i, j, x0, x1, runLen });
     }
+
     i = j + 1;
   }
+
   ctx.restore();
+  return runs;
 }
 
 function drawTimeSeriesSingle(buckets, sizes, series, sel) {
@@ -407,6 +426,42 @@ function drawTimeSeriesSingle(buckets, sizes, series, sel) {
   const plotH = H - padT - padB;
   const N = buckets.length;
 
+  // ---- Shift boundary markers (05:00 / 13:00 / 21:00) ----
+  if (N >= 2) {
+  ctx.save();
+
+  // line style
+  ctx.strokeStyle = isDark() ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.14)";
+  ctx.lineWidth = 2;
+
+  // label style (optional)
+  ctx.fillStyle = isDark() ? "rgba(255,255,255,0.65)" : "rgba(0,0,0,0.55)";
+  ctx.font = "11px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+
+  const xFor = (i) => padL + plotW * (N === 1 ? 0 : i / (N - 1));
+
+  for (let i = 0; i < N; i++) {
+    const d = new Date(buckets[i]);
+    const lab = shiftBoundaryLabel(d);
+    if (!lab) continue;
+
+    const x = xFor(i);
+
+    // vertical line
+    ctx.beginPath();
+    ctx.moveTo(x, padT);
+    ctx.lineTo(x, padT + plotH);
+    ctx.stroke();
+
+    // small label at top
+    ctx.fillText(lab, x, padT + 2);
+  }
+
+  ctx.restore();
+  }
+  
   let maxY = 0;
   for (const v of line) maxY = Math.max(maxY, v);
   maxY = Math.max(5, Math.ceil(maxY * 1.15));
@@ -416,7 +471,83 @@ function drawTimeSeriesSingle(buckets, sizes, series, sel) {
   ctx.fillRect(0, 0, W, H);
 
   const stoppedMask = computeStoppedMask(sizes, series, N);
-  shadeStopped(ctx, stoppedMask, padL, padT, plotW, plotH, N);
+  const runs = shadeStopped(ctx, stoppedMask, padL, padT, plotW, plotH, N);
+
+  // Label each shaded run with its duration
+  // Label each shaded run with its duration (dynamic sizing + vertical fallback)
+  const bucketMinutes = Number(lastOvenData?.bucketMinutes ?? 5);
+
+  ctx.save();
+  ctx.textAlign = "top";
+  ctx.textBaseline = "middle";
+
+  for (const r of runs) {
+  const minutes = r.runLen * bucketMinutes;
+  // compact label: prefers "1h 5m" but for tight spaces uses "65m" or "1h"
+  function compactLabel(m) {
+    if (!Number.isFinite(m) || m <= 0) return "0m";
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    const rem = m % 60;
+    return rem ? `${h}h ${rem}m` : `${h}h`;
+  }
+  const fullLabel = compactLabel(minutes);
+  const compactOne = (minutes >= 60 && (minutes % 60) !== 0)
+    ? `${Math.floor(minutes / 60)}h${minutes % 60}` // e.g. "1h5"
+    : `${minutes}m`;
+
+  // Choose base font size and compute available width
+  const maxWidth = r.x1 - r.x0 - 8; // allow small margin
+  const minFontPx = 9;
+  let fontPx = 12; // starting font size
+  ctx.fillStyle = isDark() ? "rgba(255,255,255,0.78)" : "rgba(0,0,0,0.65)";
+
+  // Try fullLabel first, shrink if necessary
+  ctx.font = `${fontPx}px sans-serif`;
+  let measured = ctx.measureText(fullLabel).width;
+
+  while (measured > maxWidth && fontPx > minFontPx) {
+    fontPx -= 1;
+    ctx.font = `${fontPx}px sans-serif`;
+    measured = ctx.measureText(fullLabel).width;
+  }
+
+  const xMid = (r.x0 + r.x1) / 2;
+  const yMid = padT + plotH / 8;
+
+  if (measured <= maxWidth && (r.x1 - r.x0) >= 34) {
+    // fits horizontally — draw it
+    ctx.fillText(fullLabel, xMid, yMid);
+  } else {
+    // doesn't fit horizontally — try compactOne with smaller font
+    let compFont = Math.max(minFontPx, Math.min(11, fontPx));
+    ctx.font = `${compFont}px sans-serif`;
+    measured = ctx.measureText(compactOne).width;
+    if (measured <= maxWidth && (r.x1 - r.x0) >= 28) {
+      ctx.fillText(compactOne, xMid, yMid);
+    } else {
+      // fallback: vertical (rotated) label centered in block
+      const verticalX = xMid;
+      const verticalY = yMid;
+      const vFont = Math.max(minFontPx, Math.min(11, compFont));
+      ctx.font = `${vFont}px sans-serif`;
+      const parts = compactOne.split(""); // single chars
+      // draw each char stacked
+      ctx.save();
+      ctx.translate(verticalX, verticalY);
+      // rotate so text reads top->bottom (clockwise)
+      ctx.rotate(-Math.PI / 2);
+      // draw horizontally rotated text (which appears vertical on screen)
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(compactOne, 0, 0);
+      ctx.restore();
+    }
+  }
+  }
+  ctx.restore();
+
+
 
   // Grid
   ctx.strokeStyle = isDark() ? "rgba(255,255,255,0.10)" : "#e6e6e6";
@@ -473,6 +604,272 @@ function drawTimeSeriesSingle(buckets, sizes, series, sel) {
 
   buildTimeSeriesLegendSingle(label);
 }
+
+/* ---------- Tooltip: snap to nearest bucket on hover ---------- */
+
+// fallback formatter if not present
+if (typeof fmtDowntimeMinutes !== "function") {
+  function fmtDowntimeMinutes(mins) {
+    if (!Number.isFinite(mins) || mins <= 0) return "0m";
+    if (mins < 60) return `${mins}m`;
+    const h = Math.floor(mins / 60), m = mins % 60;
+    return m ? `${h}h ${m}m` : `${h}h`;
+  }
+}
+
+const tooltipEl = document.getElementById("chartTooltip");
+
+function formatIsoLocal(ts) {
+  const d = new Date(Number(ts));
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Compute mapping from mouse X -> bucket index (uses same pads/geometry as draw function)
+function xToBucketIndex(canvasEl, mouseX, bucketsCount) {
+  // MUST match drawTimeSeriesSingle padding
+  const padL = 60, padR = 20;
+  const W = canvasEl.width;
+  const plotW = W - padL - padR;
+  if (bucketsCount <= 1) return 0;
+  const rel = mouseX - padL;
+  const t = Math.max(0, Math.min(1, rel / (plotW || 1)));
+  const idx = Math.round(t * (bucketsCount - 1));
+  return idx;
+}
+
+function drawCrosshairOnTimeSeries(idx) {
+  if (!canvas || !lastOvenData) return;
+  const buckets = Array.isArray(lastOvenData.buckets) ? lastOvenData.buckets : [];
+  if (!buckets.length) return;
+
+  const { buckets: b, sizes, series } = unpackSeries(lastOvenData);
+  const sel = (tsSizeFilterEl?.value) || "ALL";
+
+  // match drawTimeSeriesSingle geometry
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  const padL = 60, padR = 20, padT = 18, padB = 44;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const N = b.length;
+
+  if (idx < 0 || idx >= N) return;
+
+  // get the series value (same as chart)
+  let yVal = 0;
+  if (sel === "ALL") {
+    yVal = sizes.reduce((t, s) => t + (series[s]?.[idx] || 0), 0);
+  } else {
+    yVal = Number(series[sel]?.[idx] || 0);
+  }
+
+  // recompute maxY like drawTimeSeriesSingle does
+  const { line } = getTsLine(b, sizes, series, sel);
+  let maxY = 0;
+  for (const v of line) maxY = Math.max(maxY, v);
+  maxY = Math.max(5, Math.ceil(maxY * 1.15));
+
+  const x = padL + plotW * (N === 1 ? 0 : idx / (N - 1));
+  const y = padT + plotH - (plotH * (yVal / maxY));
+
+  ctx.save();
+
+  // crosshair style
+  ctx.strokeStyle = isDark() ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)";
+  ctx.lineWidth = 1;
+
+  // vertical line
+  ctx.beginPath();
+  ctx.moveTo(x, padT);
+  ctx.lineTo(x, padT + plotH);
+  ctx.stroke();
+
+  // horizontal line
+  ctx.beginPath();
+  ctx.moveTo(padL, y);
+  ctx.lineTo(padL + plotW, y);
+  ctx.stroke();
+
+  // dot at point
+  ctx.fillStyle = isDark() ? "rgba(255,255,255,0.85)" : "rgba(0,0,0,0.75)";
+  ctx.beginPath();
+  ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+
+// Find shaded run that contains index (based on stoppedMask)
+function findRunContainingIndex(sizes, series, idx) {
+  const N = (series && sizes && sizes.length) ? (series[sizes[0]]?.length ?? 0) : 0;
+  if (!N) return null;
+
+  // compute stopped mask for index ranges
+  const mask = new Array(N).fill(false);
+  for (let i = 0; i < N; i++) {
+    let total = 0;
+    for (const s of sizes) total += (series[s]?.[i] || 0);
+    mask[i] = (total === 0);
+  }
+  if (!mask[idx]) return null;
+
+  let i = idx, j = idx;
+  while (i - 1 >= 0 && mask[i - 1]) i--;
+  while (j + 1 < N && mask[j + 1]) j++;
+  return { i, j, runLen: j - i + 1 };
+}
+
+// Build tooltip HTML content for a specific bucket index
+function tooltipContentForIndex(idx) {
+  if (!lastOvenData) return "";
+  const buckets = Array.isArray(lastOvenData.buckets) ? lastOvenData.buckets : [];
+  const sizes = Array.isArray(lastOvenData.sizes) ? lastOvenData.sizes : [];
+  const series = lastOvenData.series || {};
+
+  if (idx < 0 || idx >= buckets.length) return "";
+
+  const sel = (tsSizeFilterEl?.value) || "ALL";
+  // time
+  const timeLocal = formatIsoLocal(buckets[idx]);
+
+  // completions
+  let completions;
+  if (sel === "ALL") {
+    completions = sizes.reduce((t, s) => t + (series[s]?.[idx] || 0), 0);
+  } else {
+    completions = Number(series[sel]?.[idx] || 0);
+  }
+
+  // downtime/run detection
+  const run = findRunContainingIndex(sizes, series, idx);
+  const bucketMinutes = Number(lastOvenData?.bucketMinutes ?? 5);
+  const runMinutes = run ? (run.runLen * bucketMinutes) : 0;
+  const isDown = !!run;
+
+  // cure value if present (aligned to same buckets)
+  let cureVal = null;
+  if (lastOvenData.cure && lastOvenData.cure.series) {
+    const cureSeriesAll = lastOvenData.cure.series || {};
+    const sKey = (sel === "ALL") ? null : sel;
+    if (sKey) {
+      cureVal = cureSeriesAll[sKey] ? cureSeriesAll[sKey][idx] : null;
+    } else {
+      // average across sizes for this bucket
+      const vals = (lastOvenData.cure.sizes || []).map(s => cureSeriesAll[s]?.[idx]).filter(v => v !== null && v !== undefined);
+      cureVal = vals.length ? (vals.reduce((a,b) => a+b,0) / vals.length) : null;
+    }
+  }
+
+  // Build HTML
+  const parts = [];
+  parts.push(`<div style="font-weight:700;margin-bottom:6px">${timeLocal}</div>`);
+  parts.push(`<div>Completions: <strong>${completions}</strong></div>`);
+  if (isDown) {
+    const downColor = isDark() ? "#ffd0d0" : "#7a0000";
+    const downBg = isDark() ? "rgba(255,80,80,0.12)" : "rgba(200,0,0,0.10)";
+    parts.push(
+  `<div style="margin-top:6px;color:${downColor};font-weight:700;background:${downBg};display:inline-block;padding:2px 6px;border-radius:6px">
+     Downtime run: ${fmtDowntimeMinutes(runMinutes)}
+   </div>`
+);
+
+    // show run buckets
+    const startT = formatIsoLocal(lastOvenData.buckets[run.i]);
+    const endT = formatIsoLocal(lastOvenData.buckets[run.j]);
+    parts.push(`<div style="font-size:12px;color:#ddd">Run: ${startT} → ${endT}</div>`);
+  } else {
+    const runColor = isDark() ? "#cfe8ff" : "#003b7a";
+    parts.push(`<div style="margin-top:6px;color:${runColor};font-weight:600">Running / has completions</div>`);
+
+  }
+
+  if (cureVal !== null && cureVal !== undefined) {
+    const c = Math.round(Number(cureVal) * 10) / 10;
+    parts.push(`<div style="margin-top:6px">Avg Cure: <strong>${c} min</strong></div>`);
+  }
+
+  return parts.join("");
+}
+
+// Show tooltip at client coords (x,y) - keeps on-screen
+function showTooltipAt(clientX, clientY, html) {
+  if (!tooltipEl) return;
+  tooltipEl.innerHTML = html;
+  tooltipEl.style.display = "block";
+
+  // adapt colors for theme
+  if (isDark()) {
+    tooltipEl.style.background = "rgba(20,20,24,0.92)";
+    tooltipEl.style.color = "#fff";
+  } else {
+    tooltipEl.style.background = "rgba(255,255,255,0.98)";
+    tooltipEl.style.color = "#111";
+  }
+
+  // Position with small offset
+  const pad = 12;
+  const rect = tooltipEl.getBoundingClientRect();
+  let left = clientX + 16;
+  let top = clientY + 12;
+
+  // keep on right if too close to right edge
+  if (left + rect.width + pad > window.innerWidth) left = clientX - rect.width - 16;
+  if (left < pad) left = pad;
+
+  // keep above if too close to bottom
+  if (top + rect.height + pad > window.innerHeight) top = clientY - rect.height - 16;
+  if (top < pad) top = pad;
+
+  tooltipEl.style.left = `${left}px`;
+  tooltipEl.style.top = `${top}px`;
+}
+
+// Hide tooltip
+function hideTooltip() {
+  if (!tooltipEl) return;
+  tooltipEl.style.display = "none";
+  tooltipEl.innerHTML = "";
+}
+
+// Mouse handlers
+function onChartMouseMove(ev) {
+  if (!canvas || !lastOvenData) return;
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = ev.clientX - rect.left;
+  const mouseY = ev.clientY - rect.top;
+
+  const buckets = Array.isArray(lastOvenData.buckets) ? lastOvenData.buckets : [];
+  if (!buckets.length) { hideTooltip(); return; }
+
+  const idx = xToBucketIndex(canvas, mouseX, buckets.length);
+  const html = tooltipContentForIndex(idx);
+  // redraw + overlay crosshair (keeps the crosshair from smearing)
+  if (hoverTsIndex !== idx) {
+  hoverTsIndex = idx;
+  renderCurrentView();         // redraw chart in current mode
+  drawCrosshairOnTimeSeries(idx);
+  }
+
+  if (!html) { hideTooltip(); return; }
+
+  showTooltipAt(ev.clientX, ev.clientY, html);
+}
+
+function onChartMouseLeave() {
+  hoverTsIndex = null;
+  renderCurrentView(); // clears crosshair by redrawing chart
+  hideTooltip();
+}
+
+// Attach listeners (safe: removes previous to avoid dupes)
+if (canvas) {
+  canvas.removeEventListener("mousemove", onChartMouseMove);
+  canvas.removeEventListener("mouseleave", onChartMouseLeave);
+  canvas.addEventListener("mousemove", onChartMouseMove);
+  canvas.addEventListener("mouseleave", onChartMouseLeave);
+}
+
 
 /* ---------- Cure time series ---------- */
 function drawCureTimeSeries(cure, selSize = "ALL") {
@@ -1139,6 +1536,18 @@ liveEl?.addEventListener("change", () => {
   }
 });
 
+function rerenderForThemeChange() {
+  if (!lastOvenData) return;
+
+  // Redraw charts/legends using current theme
+  setChartMode(chartViewEl?.value || "timeseries");
+  renderCurrentView();
+
+  // Repaint KPI cards if you want them to update too
+  renderKpis(lastOvenData.kpis);
+}
+
+
 // Rolling last hour helpers
 function setLastHourRangeAndRefresh() {
   const now = new Date();
@@ -1163,6 +1572,17 @@ function stopLiveLastHour() {
   if (liveHourTimer) clearInterval(liveHourTimer);
   liveHourTimer = null;
   lastHourBtn?.classList.remove("active");
+}
+
+function shiftBoundaryLabel(d) {
+  // assumes d is local Date
+  const h = d.getHours();
+  const m = d.getMinutes();
+  if (m !== 0) return null;
+  if (h === 5) return "S1";
+  if (h === 13) return "S2";
+  if (h === 21) return "S3";
+  return null;
 }
 
 lastHourBtn?.addEventListener("click", () => {
@@ -1201,5 +1621,28 @@ tsSizeFilterEl?.addEventListener("change", renderCurrentView);
   setRange(start, end);
 
   setChartMode(chartViewEl?.value || "timeseries");
+  (function watchThemeChanges() {
+  const root = document.documentElement;
+
+  // If your theme toggle changes a class on <html>, this will catch it
+  const obs = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      if (m.type === "attributes" && m.attributeName === "class") {
+        rerenderForThemeChange();
+        break;
+      }
+    }
+  });
+
+  obs.observe(root, { attributes: true, attributeFilter: ["class"] });
+
+  // Optional: also catch OS theme changes if you support "auto"
+  const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
+  if (mq?.addEventListener) {
+    mq.addEventListener("change", () => rerenderForThemeChange());
+  } else if (mq?.addListener) {
+    mq.addListener(() => rerenderForThemeChange());
+  }
+  })();
   refresh();
 })();

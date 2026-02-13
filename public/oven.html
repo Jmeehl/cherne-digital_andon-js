@@ -123,7 +123,7 @@
     <!-- CURE SECTION (hidden unless Cure Time view) -->
     <section class="panel" id="cureSection" style="display:none; margin-top:14px;">
       <h2>Avg Cure Time (5 min buckets)</h2>
-      <canvas id="cureChart" width="1200" height="360"></canvas>
+      <canvas id="cureChart" width="1200" height="420"></canvas>
       <div class="muted">Goal range: 45–120 minutes</div>
     </section>
 
@@ -135,6 +135,14 @@
 
     <div class="error" id="error" style="display:none;"></div>
   </div>
+
+  <!-- Tooltip for time-series chart (insert near your canvases or at end of body) -->
+<div id="chartTooltip" style="position:fixed;pointer-events:none;display:none;
+     background:rgba(0,0,0,0.85);color:#fff;padding:8px 10px;border-radius:6px;
+     font-size:13px;z-index:10000;max-width:320px;box-shadow:0 6px 18px rgba(0,0,0,0.35);">
+  <!-- content populated by JS -->
+</div>
+
 
   <script src="/nav.js"></script>
   <script src="/oven.js"></script>
