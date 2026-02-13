@@ -32,9 +32,28 @@ export function getSqlConfigFromEnv() {
       min: 0,
       idleTimeoutMillis: 30000,
     },
-    requestTimeout: 20000,
+    requestTimeout: 120000,
   };
 }
+
+let moldRefreshInFlight = false;
+
+async function refreshMoldSnapshot() {
+  if (moldRefreshInFlight) return;
+  moldRefreshInFlight = true;
+
+  const cfg = loadMoldConfig();
+  try {
+    const rows = await fetchLatestMolds();
+    moldSnapshot = computeMoldSnapshot(rows, cfg);
+    io.to("molds").emit("moldsSnapshot", moldSnapshot);
+  } catch (e) {
+    console.error("Mold snapshot refresh failed:", e?.message ?? e);
+  } finally {
+    moldRefreshInFlight = false;
+  }
+}
+
 
 export async function getPool() {
   // Single, resilient pool initializer

@@ -49,6 +49,8 @@ const cureCanvas = document.getElementById("cureChart");
 let liveTimer = null;
 let lastOvenData = null;
 let hoverTsIndex = null;
+let hoverRAF = null;
+let pendingHoverIdx = null;
 
 // Last hour live mode
 let liveHourTimer = null;
@@ -720,6 +722,7 @@ function findRunContainingIndex(sizes, series, idx) {
   return { i, j, runLen: j - i + 1 };
 }
 
+
 // Build tooltip HTML content for a specific bucket index
 function tooltipContentForIndex(idx) {
   if (!lastOvenData) return "";
@@ -844,12 +847,24 @@ function onChartMouseMove(ev) {
 
   const idx = xToBucketIndex(canvas, mouseX, buckets.length);
   const html = tooltipContentForIndex(idx);
-  // redraw + overlay crosshair (keeps the crosshair from smearing)
-  if (hoverTsIndex !== idx) {
-  hoverTsIndex = idx;
-  renderCurrentView();         // redraw chart in current mode
-  drawCrosshairOnTimeSeries(idx);
-  }
+  // schedule redraw once per animation frame (prevents heavy redraw spam)
+  pendingHoverIdx = idx;
+if (!hoverRAF) {
+  hoverRAF = requestAnimationFrame(() => {
+    hoverRAF = null;
+    if (pendingHoverIdx === null || pendingHoverIdx === undefined) return;
+
+    if (hoverTsIndex !== pendingHoverIdx) {
+      hoverTsIndex = pendingHoverIdx;
+      renderCurrentView();                 // redraw base chart
+      drawCrosshairOnTimeSeries(hoverTsIndex); // overlay crosshair
+    } else {
+      // even if same bucket, just redraw crosshair without full redraw if you want
+      // (usually unnecessary)
+    }
+  });
+}
+
 
   if (!html) { hideTooltip(); return; }
 
@@ -857,10 +872,14 @@ function onChartMouseMove(ev) {
 }
 
 function onChartMouseLeave() {
+  pendingHoverIdx = null;
   hoverTsIndex = null;
-  renderCurrentView(); // clears crosshair by redrawing chart
+  if (hoverRAF) cancelAnimationFrame(hoverRAF);
+  hoverRAF = null;
+  renderCurrentView(); // clears crosshair
   hideTooltip();
 }
+
 
 // Attach listeners (safe: removes previous to avoid dupes)
 if (canvas) {
