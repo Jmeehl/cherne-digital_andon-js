@@ -478,7 +478,7 @@ function drawTimeSeriesSingle(buckets, sizes, series, sel) {
   const bucketMinutes = Number(lastOvenData?.bucketMinutes ?? 5);
 
   ctx.save();
-  ctx.textAlign = "top";
+  ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
   for (const r of runs) {
