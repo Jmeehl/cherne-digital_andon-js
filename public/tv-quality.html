@@ -21,7 +21,10 @@
   // Rotation list (add future quality pages here)
   // Example future pages: "/quality-scrap", "/quality-yield", "/quality-andon"
   const ROTATE_URLS = [
-    "/oven"
+  "/embed/oven?chart=timeseries&range=prevShift&theme=light",
+  "/embed/oven?chart=timeseries&range=lastHour&title=Oven Completions — Last Hour",
+  "/embed/oven?chart=cureTimeseries&range=prevShift&title=Cure Time — Prev Shift",
+  "/embed/oven?chart=cureTimeseries&range=prevWeek&size=2&title=Cure Time (Size 2) — Prev Week"
   ];
 
   const ROTATE_EVERY_MS = 60 * 1000;     // 60 seconds per page

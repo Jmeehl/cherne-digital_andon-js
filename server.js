@@ -1508,6 +1508,8 @@ app.get("/oven", (req, res) => res.sendFile(path.join(__dirname, "public", "oven
 app.get("/oven-performance", (req, res) => res.sendFile(path.join(__dirname, "public", "oven.html")));
 app.get("/tv/quality", (req, res) => res.sendFile(path.join(__dirname, "public", "tv-quality.html")));
 app.get("/tv/maintenance", (req, res) => res.sendFile(path.join(__dirname, "public", "tv-maintenance.html")));
+app.get("/embed/oven", (req, res) => res.sendFile(path.join(__dirname, "public", "embed", "oven.html")));
+
 
 
 //const PORT = process.env.PORT ?? 3000;
