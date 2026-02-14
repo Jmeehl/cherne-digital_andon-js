@@ -1506,6 +1506,8 @@ app.get("/history/:dept", (req, res) => res.sendFile(path.join(__dirname, "publi
 app.get("/cell/:id", (req, res) => res.sendFile(path.join(__dirname, "public", "cell.html")));
 app.get("/oven", (req, res) => res.sendFile(path.join(__dirname, "public", "oven.html")));
 app.get("/oven-performance", (req, res) => res.sendFile(path.join(__dirname, "public", "oven.html")));
+app.get("/tv/quality", (req, res) => res.sendFile(path.join(__dirname, "public", "tv-quality.html")));
+app.get("/tv/maintenance", (req, res) => res.sendFile(path.join(__dirname, "public", "tv-maintenance.html")));
 
 
 //const PORT = process.env.PORT ?? 3000;

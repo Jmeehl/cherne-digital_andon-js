@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Quality TV</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#000; overflow:hidden; }
+  iframe { width:100%; height:100%; border:0; }
+</style>
+</head>
+<body>
+<iframe id="screen" src="/oven"></iframe>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  // --------- CONFIG (edit over time) ---------
+  const DEPT = "quality";
+  const DASHBOARD_URL = `/dashboard/${DEPT}`;
+
+  // Rotation list (add future quality pages here)
+  // Example future pages: "/quality-scrap", "/quality-yield", "/quality-andon"
+  const ROTATE_URLS = [
+    "/oven"
+  ];
+
+  const ROTATE_EVERY_MS = 60 * 1000;     // 60 seconds per page
+  const RETURN_COOLDOWN_MS = 15 * 1000;  // wait 15s after call clears before rotating again
+  // -------------------------------------------
+
+  const screen = document.getElementById("screen");
+  const socket = io({ query: { dept: DEPT } });
+
+  let rotateIndex = 0;
+  let rotateTimer = null;
+  let inAlertMode = false;
+  let returnCooldownTimer = null;
+
+  function anyActiveCall(snapshot) {
+    return Array.isArray(snapshot?.cells) && snapshot.cells.some(c => c.status === "WAITING");
+  }
+
+  function go(url) {
+    if (screen.getAttribute("src") !== url) screen.src = url;
+  }
+
+  function startRotation() {
+    stopRotation();
+    if (!ROTATE_URLS.length) return;
+
+    // load current page immediately
+    go(ROTATE_URLS[rotateIndex % ROTATE_URLS.length]);
+
+    rotateTimer = setInterval(() => {
+      if (inAlertMode) return;
+      rotateIndex = (rotateIndex + 1) % ROTATE_URLS.length;
+      go(ROTATE_URLS[rotateIndex]);
+    }, ROTATE_EVERY_MS);
+  }
+
+  function stopRotation() {
+    if (rotateTimer) clearInterval(rotateTimer);
+    rotateTimer = null;
+  }
+
+  function enterAlertMode() {
+    inAlertMode = true;
+    if (returnCooldownTimer) clearTimeout(returnCooldownTimer);
+    returnCooldownTimer = null;
+    stopRotation();
+    go(DASHBOARD_URL);
+  }
+
+  function exitAlertMode() {
+    inAlertMode = false;
+    if (returnCooldownTimer) clearTimeout(returnCooldownTimer);
+    returnCooldownTimer = setTimeout(() => {
+      startRotation();
+    }, RETURN_COOLDOWN_MS);
+  }
+
+  socket.on("connect", () => {
+    startRotation();
+  });
+
+  socket.on("deptSnapshot", (snap) => {
+    const active = anyActiveCall(snap);
+    if (active && !inAlertMode) enterAlertMode();
+    if (!active && inAlertMode) exitAlertMode();
+  });
+
+  // If socket drops, keep rotating (don’t freeze screen)
+  socket.on("disconnect", () => {
+    // stay on whatever is loaded; rotation can continue
+    startRotation();
+  });
+</script>
+</body>
+</html>
