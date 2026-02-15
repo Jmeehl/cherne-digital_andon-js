@@ -22,7 +22,16 @@
   const rangeName = (params.get("range") || "lasthour").toLowerCase();
   const sizeFilter = (params.get("size") || "ALL").toUpperCase();
   const titleOverride = params.get("title");
-  const theme = (params.get("theme") || "auto").toLowerCase();
+  const theme = (params.get("theme") || "light").toLowerCase();
+
+  const deptParam = (params.get("dept") || "").toLowerCase();
+function deptLabel() {
+  if (!deptParam) return "";
+  if (deptParam === "quality") return "QUALITY";
+  if (deptParam === "maintenance") return "MAINTENANCE";
+  return deptParam.toUpperCase();
+}
+
 
   // ---------- theme ----------
   function applyTheme() {
@@ -44,6 +53,91 @@
   function isLight() {
     return document.documentElement.classList.contains("theme-light");
   }
+
+  // ---- Match main oven page styling ----
+const BUCKET_MINUTES_DEFAULT = 5;
+
+// Shade only if downtime run is at least this many buckets (matches your main behavior)
+const SHADE_AFTER_EMPTY_BUCKETS = 3;
+
+function fmtDowntimeMinutes(mins) {
+  if (!Number.isFinite(mins) || mins <= 0) return "0m";
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m ? `${h}h ${m}m` : `${h}h`;
+}
+
+// Build a "stopped" mask based on completions across ALL sizes (same idea as main page)
+function computeStoppedMaskFromCompletions(data) {
+  const buckets = data.buckets || [];
+  const N = buckets.length;
+  const sizes = data.sizes || [];
+  const series = data.series || {};
+  const mask = new Array(N).fill(false);
+
+  for (let i = 0; i < N; i++) {
+    let total = 0;
+    for (const s of sizes) total += (series[s]?.[i] || 0);
+    mask[i] = (total === 0);
+  }
+  return mask;
+}
+
+// Shade runs of stopped buckets, return run info so we can label them
+function shadeStoppedRuns(ctx, mask, padL, padT, plotW, plotH, N) {
+  const runs = [];
+  if (N < 2) return runs;
+
+  const stepPx = plotW / (N - 1);
+  const xFor = (i) => padL + plotW * (i / (N - 1));
+
+  ctx.save();
+  ctx.fillStyle = isLight() ? "rgba(0,0,0,0.07)" : "rgba(255,255,255,0.10)";
+
+  let i = 0;
+  while (i < N) {
+    if (!mask[i]) { i++; continue; }
+    let j = i;
+    while (j + 1 < N && mask[j + 1]) j++;
+
+    const runLen = (j - i + 1);
+    if (runLen >= SHADE_AFTER_EMPTY_BUCKETS) {
+      const x0 = Math.max(padL, xFor(i) - stepPx / 2);
+      const x1 = Math.min(padL + plotW, xFor(j) + stepPx / 2);
+      ctx.fillRect(x0, padT, x1 - x0, plotH);
+      runs.push({ i, j, runLen, x0, x1 });
+    }
+    i = j + 1;
+  }
+
+  ctx.restore();
+  return runs;
+}
+
+function labelStoppedRuns(ctx, runs, padT, plotH, bucketMinutes) {
+  ctx.save();
+  ctx.fillStyle = isLight() ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.75)";
+  ctx.font = `${Math.round(12 * (canvas.width / 1920))}px sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  // Put labels higher (similar to what you asked on main chart)
+  const y = padT + plotH * 0.22;
+
+  for (const r of runs) {
+    const width = r.x1 - r.x0;
+    if (width < 60) continue; // avoid clutter in tiny runs
+
+    const minutes = r.runLen * bucketMinutes;
+    const label = fmtDowntimeMinutes(minutes);
+    const x = (r.x0 + r.x1) / 2;
+    ctx.fillText(label, x, y);
+  }
+
+  ctx.restore();
+}
+
 
   // ---------- utils ----------
   function pad(n) { return String(n).padStart(2, "0"); }
@@ -139,14 +233,16 @@
 
   // ---------- canvas sizing (sharp on TVs) ----------
   function resizeCanvas() {
-    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-    const w = Math.floor(window.innerWidth * dpr);
-    const h = Math.floor(window.innerHeight * dpr);
-    if (canvas.width !== w || canvas.height !== h) {
-      canvas.width = w;
-      canvas.height = h;
-    }
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  const rect = canvas.getBoundingClientRect(); // respects the padded frame
+  const w = Math.floor(rect.width * dpr);
+  const h = Math.floor(rect.height * dpr);
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
   }
+}
+
   window.addEventListener("resize", () => { resizeCanvas(); renderLast(); });
   resizeCanvas();
 
@@ -160,7 +256,7 @@
     ctx.fillStyle = isLight() ? "#ffffff" : "#0f1419";
     ctx.fillRect(0, 0, W, H);
 
-    const grid = isLight() ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.10)";
+    const grid = isLight() ? "rgba(0,0,0,0.14)" : "rgba(255,255,255,0.10)";
     const axis = isLight() ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.25)";
     const text = isLight() ? "rgba(0,0,0,0.70)" : "rgba(255,255,255,0.70)";
 
@@ -352,7 +448,13 @@
     const modeTitle = (chartMode === "curetimeseries") ? "Cure Time" : "Completions";
     const sizeText = (sizeFilter === "ALL") ? "All Sizes" : `Size ${sizeFilter}`;
 
-    titleEl.textContent = titleOverride || `Oven ${modeTitle} — ${rangeObj.label} — ${sizeText}`;
+    const dept = deptLabel();
+    const prefix = dept ? `${dept} — ` : "";
+
+    titleEl.textContent =
+    titleOverride ||
+    `${prefix}Oven ${modeTitle} — ${rangeObj.label} — ${sizeText}`;
+
     metaEl.textContent = rangeText;
   }
 
@@ -384,8 +486,26 @@
     const maxY = computeMaxY(line);
 
     drawAxesAndGrid(ctx, padL, padR, padT, padB, maxY);
+
+    // ✅ Downtime shading (use completions mask even if cure chart is selected)
+    const stoppedMask = computeStoppedMaskFromCompletions(data);
+    const W = canvas.width, H = canvas.height;
+    const plotW = W - padL - padR;
+    const plotH = H - padT - padB;
+    const N = buckets.length;
+
+    const runs = shadeStoppedRuns(ctx, stoppedMask, padL, padT, plotW, plotH, N);
+
+    // Shift boundaries on top of shading (nice visual)
     drawShiftBoundaries(ctx, buckets, padL, padR, padT, padB);
+
+    // Main line on top
     drawLine(ctx, buckets, line, padL, padR, padT, padB, maxY);
+
+    // Optional: label downtime runs (matches your main page feature)
+    const bucketMinutes = Number(data.bucketMinutes || BUCKET_MINUTES_DEFAULT);
+    labelStoppedRuns(ctx, runs, padT, plotH, bucketMinutes);
+
 
     setHeading(rangeObj);
   }

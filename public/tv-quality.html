@@ -6,97 +6,118 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   html, body { margin:0; padding:0; height:100%; background:#000; overflow:hidden; }
-  iframe { width:100%; height:100%; border:0; }
+  iframe { width:100%; height:100%; border:5; }
 </style>
 </head>
 <body>
-<iframe id="screen" src="/oven"></iframe>
+  <div id="wrap">
+    <iframe id="a" class="frame show" src="/embed/oven?dept=quality&chart=timeseries&range=lastHour"></iframe>
+    <iframe id="b" class="frame" src="about:blank"></iframe>
+  </div>
 
-<script src="/socket.io/socket.io.js"></script>
-<script>
-  // --------- CONFIG (edit over time) ---------
-  const DEPT = "quality";
-  const DASHBOARD_URL = `/dashboard/${DEPT}`;
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // -------- CONFIG --------
+    const DEPT = "quality";
+    const DASHBOARD_URL = `/dashboard/${DEPT}`;
 
-  // Rotation list (add future quality pages here)
-  // Example future pages: "/quality-scrap", "/quality-yield", "/quality-andon"
-  const ROTATE_URLS = [
-  "/embed/oven?chart=timeseries&range=prevShift&theme=light",
-  "/embed/oven?chart=timeseries&range=lastHour&title=Oven Completions — Last Hour",
-  "/embed/oven?chart=cureTimeseries&range=prevShift&title=Cure Time — Prev Shift",
-  "/embed/oven?chart=cureTimeseries&range=prevWeek&size=2&title=Cure Time (Size 2) — Prev Week"
-  ];
+    const ROTATE_URLS = [
+      `/embed/oven?dept=quality&chart=timeseries&range=lastHour&title=Oven Completions — Last Hour`,
+      `/embed/oven?dept=quality&chart=timeseries&range=prevWeek&title=Oven Completions — Last Week`,
+      `/embed/oven?dept=quality&chart=cureTimeseries&range=prevShift&title=Cure Time — Prev Shift`,
+      `/embed/oven?dept=quality&chart=cureTimeseries&range=prevWeek&size=2&title=Cure Time (Size 2) — Prev Week`
+    ];
 
-  const ROTATE_EVERY_MS = 60 * 1000;     // 60 seconds per page
-  const RETURN_COOLDOWN_MS = 15 * 1000;  // wait 15s after call clears before rotating again
-  // -------------------------------------------
+    const ROTATE_EVERY_MS = 60 * 1000;
+    const RETURN_COOLDOWN_MS = 15 * 1000;
+    const FADE_MS = 1 * 1000; // transition speed
+    // ------------------------
 
-  const screen = document.getElementById("screen");
-  const socket = io({ query: { dept: DEPT } });
+    // Add fade styles
+    const style = document.createElement("style");
+    style.textContent = `
+      html,body{margin:0;height:100%;background:#000;overflow:hidden}
+      #wrap{position:fixed;inset:0;background:#000}
+      .frame{position:absolute;inset:0;border:0;width:100%;height:100%;opacity:0;transition:opacity ${FADE_MS}ms ease}
+      .frame.show{opacity:1}
+    `;
+    document.head.appendChild(style);
 
-  let rotateIndex = 0;
-  let rotateTimer = null;
-  let inAlertMode = false;
-  let returnCooldownTimer = null;
+    const socket = io({ query: { dept: DEPT } });
 
-  function anyActiveCall(snapshot) {
-    return Array.isArray(snapshot?.cells) && snapshot.cells.some(c => c.status === "WAITING");
-  }
+    const a = document.getElementById("a");
+    const b = document.getElementById("b");
+    let front = a, back = b;
 
-  function go(url) {
-    if (screen.getAttribute("src") !== url) screen.src = url;
-  }
+    let rotateIndex = 0;
+    let rotateTimer = null;
+    let inAlertMode = false;
+    let returnCooldownTimer = null;
 
-  function startRotation() {
-    stopRotation();
-    if (!ROTATE_URLS.length) return;
+    function anyActiveCall(snapshot) {
+      return Array.isArray(snapshot?.cells) && snapshot.cells.some(c => c.status === "WAITING");
+    }
 
-    // load current page immediately
-    go(ROTATE_URLS[rotateIndex % ROTATE_URLS.length]);
+    function swapTo(url) {
+      // Load into back iframe, then crossfade when loaded
+      back.onload = () => {
+        back.classList.add("show");
+        front.classList.remove("show");
 
-    rotateTimer = setInterval(() => {
-      if (inAlertMode) return;
-      rotateIndex = (rotateIndex + 1) % ROTATE_URLS.length;
-      go(ROTATE_URLS[rotateIndex]);
-    }, ROTATE_EVERY_MS);
-  }
+        // swap refs
+        const tmp = front;
+        front = back;
+        back = tmp;
 
-  function stopRotation() {
-    if (rotateTimer) clearInterval(rotateTimer);
-    rotateTimer = null;
-  }
+        // stop repeated onload firing
+        back.onload = null;
+      };
+      back.src = url;
+    }
 
-  function enterAlertMode() {
-    inAlertMode = true;
-    if (returnCooldownTimer) clearTimeout(returnCooldownTimer);
-    returnCooldownTimer = null;
-    stopRotation();
-    go(DASHBOARD_URL);
-  }
+    function startRotation() {
+      stopRotation();
+      if (!ROTATE_URLS.length) return;
 
-  function exitAlertMode() {
-    inAlertMode = false;
-    if (returnCooldownTimer) clearTimeout(returnCooldownTimer);
-    returnCooldownTimer = setTimeout(() => {
+      swapTo(ROTATE_URLS[rotateIndex % ROTATE_URLS.length]);
+
+      rotateTimer = setInterval(() => {
+        if (inAlertMode) return;
+        rotateIndex = (rotateIndex + 1) % ROTATE_URLS.length;
+        swapTo(ROTATE_URLS[rotateIndex]);
+      }, ROTATE_EVERY_MS);
+    }
+
+    function stopRotation() {
+      if (rotateTimer) clearInterval(rotateTimer);
+      rotateTimer = null;
+    }
+
+    function enterAlertMode() {
+      inAlertMode = true;
+      if (returnCooldownTimer) clearTimeout(returnCooldownTimer);
+      returnCooldownTimer = null;
+      stopRotation();
+      swapTo(DASHBOARD_URL);
+    }
+
+    function exitAlertMode() {
+      inAlertMode = false;
+      if (returnCooldownTimer) clearTimeout(returnCooldownTimer);
+      returnCooldownTimer = setTimeout(() => startRotation(), RETURN_COOLDOWN_MS);
+    }
+
+    socket.on("connect", () => startRotation());
+
+    socket.on("deptSnapshot", (snap) => {
+      const active = anyActiveCall(snap);
+      if (active && !inAlertMode) enterAlertMode();
+      if (!active && inAlertMode) exitAlertMode();
+    });
+
+    socket.on("disconnect", () => {
+      // keep showing whatever is on screen; resume rotation
       startRotation();
-    }, RETURN_COOLDOWN_MS);
-  }
-
-  socket.on("connect", () => {
-    startRotation();
-  });
-
-  socket.on("deptSnapshot", (snap) => {
-    const active = anyActiveCall(snap);
-    if (active && !inAlertMode) enterAlertMode();
-    if (!active && inAlertMode) exitAlertMode();
-  });
-
-  // If socket drops, keep rotating (don’t freeze screen)
-  socket.on("disconnect", () => {
-    // stay on whatever is loaded; rotation can continue
-    startRotation();
-  });
-</script>
+    });
+  </script>
 </body>
-</html>
