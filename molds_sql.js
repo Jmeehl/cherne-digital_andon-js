@@ -89,6 +89,9 @@ export async function fetchLatestMolds() {
       FROM dbo.MoldData
       WHERE MoldNumber IS NOT NULL
         AND MoldSize IS NOT NULL
+        AND Extract_DateTime IS NOT NULL
+        AND Extract_DateTime >= DATEADD(day, -120, GETDATE())
+
     )
     SELECT
       MoldNumber,

@@ -25,6 +25,16 @@ const yesterdayBtn = document.getElementById("yesterdayBtn");
 const lastWeekBtn = document.getElementById("lastWeekBtn");
 const lastHourBtn = document.getElementById("lastHourBtn");
 const liveEl = document.getElementById("live");
+// Event bar settings (tweak colors to match your palette)
+const EVENT_COLORS = {
+  fiix: isDark() ? "rgba(255,170,120,0.96)" : "rgba(206,92,0,0.96)",
+  mfg:  isDark() ? "rgba(100,190,255,0.96)" : "rgba(10,90,180,0.96)"
+};
+const EVENT_TEXT_COLOR = isDark() ? "#000" : "#fff";
+const EVENT_BAR_HEIGHT_PX = 20; // adjust for TV vs desktop
+const EVENT_TOP_GAP = 10;
+const EVENT_MIN_PIXELS_FOR_TEXT = 60;
+
 
 const chartViewEl = document.getElementById("chartView");
 const tsSizeFilterEl = document.getElementById("tsSizeFilter");
@@ -1603,6 +1613,8 @@ function shiftBoundaryLabel(d) {
   if (h === 21) return "S3";
   return null;
 }
+
+
 
 lastHourBtn?.addEventListener("click", () => {
   if (!liveHourActive) {

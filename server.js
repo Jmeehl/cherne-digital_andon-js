@@ -236,6 +236,7 @@ let moldSnapshot = {
   worst: null
 };
 
+
 function computeMoldSnapshot(rows, cfg) {
   const threshold = Number(cfg.cleanThresholdCycles ?? 250);
   const dueSoonAt = Math.round(threshold * Number(cfg.dueSoonRatio ?? 0.85));
@@ -275,7 +276,12 @@ function computeMoldSnapshot(rows, cfg) {
   return { now: Date.now(), updatedAt: Date.now(), config: cfg, counts, molds, worst };
 }
 
+let moldRefreshInFlight = false;
+
 async function refreshMoldSnapshot() {
+  if (moldRefreshInFlight) return;
+  moldRefreshInFlight = true;
+
   const cfg = loadMoldConfig();
   try {
     const rows = await fetchLatestMolds();
@@ -283,6 +289,8 @@ async function refreshMoldSnapshot() {
     io.to("molds").emit("moldsSnapshot", moldSnapshot);
   } catch (e) {
     console.error("Mold snapshot refresh failed:", e?.message ?? e);
+  } finally {
+    moldRefreshInFlight = false;
   }
 }
 
@@ -918,6 +926,60 @@ app.get("/manifest/:cellId.json", (req, res) => {
   });
 });
 
+// server.js (add near other /api/* routes)
+app.get("/api/events", async (req, res) => {
+  try {
+    // Expect startLocal / endLocal as "YYYY-MM-DDTHH:MM"
+    const startLocal = req.query.startLocal;
+    const endLocal = req.query.endLocal;
+    const dept = req.query.dept || null; // optional filter
+
+    if (!startLocal || !endLocal) {
+      return res.status(400).json({ ok: false, error: "Missing startLocal or endLocal" });
+    }
+
+    // parse to Date objects (server local timezone)
+    const start = new Date(startLocal);
+    const end = new Date(endLocal);
+
+    // TODO: Replace the sample below with a DB query that returns events that overlap
+    // the range: (event.start < end) AND (event.end > start)
+    // The returned objects should look like:
+    // { id: "F-123456", type: "fiix"|"mfg", start: "ISO", end: "ISO", summary: "..." }
+
+    // ---- SAMPLE (for local testing) ----
+    const sampleNow = new Date();
+    const sample = [
+      {
+        id: "F-123456",
+        type: "fiix",
+        start: new Date(sampleNow.getTime() - 1000*60*140).toISOString(),
+        end: new Date(sampleNow.getTime() - 1000*60*110).toISOString(),
+        summary: "Replace heater"
+      },
+      {
+        id: null,
+        type: "mfg",
+        start: new Date(sampleNow.getTime() - 1000*60*95).toISOString(),
+        end: new Date(sampleNow.getTime() - 1000*60*90).toISOString(),
+        summary: "Mfg eng call"
+      }
+    ];
+    // filter sample to overlap requested range
+    const events = sample.filter(ev => {
+      const s = new Date(ev.start).getTime();
+      const e = new Date(ev.end || ev.start).getTime();
+      return s < end.getTime() && e > start.getTime();
+    });
+
+    return res.json({ ok: true, events });
+  } catch (err) {
+    console.error("GET /api/events error:", err);
+    return res.status(500).json({ ok: false, error: err.message || String(err) });
+  }
+});
+
+
 // --------------------
 // Oven APIs
 // --------------------
@@ -1509,6 +1571,11 @@ app.get("/oven-performance", (req, res) => res.sendFile(path.join(__dirname, "pu
 app.get("/tv/quality", (req, res) => res.sendFile(path.join(__dirname, "public", "tv-quality.html")));
 app.get("/tv/maintenance", (req, res) => res.sendFile(path.join(__dirname, "public", "tv-maintenance.html")));
 app.get("/embed/oven", (req, res) => res.sendFile(path.join(__dirname, "public", "embed", "oven.html")));
+// Embed (TV chart-only)
+app.get("/embed/oven", (req, res) =>
+  res.sendFile(path.join(__dirname, "public", "embed", "oven.html"))
+);
+
 
 
 
