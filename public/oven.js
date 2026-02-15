@@ -427,6 +427,78 @@ function shadeStopped(ctx, mask, padL, padT, plotW, plotH, N) {
   return runs;
 }
 
+function drawEventBars(ctx, buckets, padL, padT, plotW, events) {
+  if (!Array.isArray(events) || events.length === 0) return;
+  if (!Array.isArray(buckets) || buckets.length < 2) return;
+
+  const rangeStart = Number(buckets[0]);
+  const rangeEnd = Number(buckets[buckets.length - 1]);
+  if (!Number.isFinite(rangeStart) || !Number.isFinite(rangeEnd) || rangeEnd <= rangeStart) return;
+
+  const xForTime = (tMs) => {
+    const tt = Math.max(rangeStart, Math.min(rangeEnd, Number(tMs)));
+    const p = (tt - rangeStart) / (rangeEnd - rangeStart);
+    return padL + plotW * p;
+  };
+
+  const barH = 14;
+  const barY = padT + 6; // near top of plot
+  const r = 6;
+
+  const fillMaint = isDark() ? "rgba(255,165,0,0.22)" : "rgba(255,140,0,0.22)";
+  const fillMfg   = isDark() ? "rgba(0,140,255,0.20)" : "rgba(0,102,204,0.18)";
+  const stroke    = isDark() ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.14)";
+  const textCol   = isDark() ? "rgba(255,255,255,0.88)" : "rgba(0,0,0,0.80)";
+
+  function roundRect(x, y, w, h, rr) {
+    const rad = Math.max(0, Math.min(rr, Math.min(w, h) / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + rad, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rad);
+    ctx.arcTo(x + w, y + h, x, y + h, rad);
+    ctx.arcTo(x, y + h, x, y, rad);
+    ctx.arcTo(x, y, x + w, y, rad);
+    ctx.closePath();
+  }
+
+  ctx.save();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = stroke;
+  ctx.font = "11px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  for (const ev of events) {
+    const s = Number(ev.startMs);
+    const e = Number(ev.endMs);
+    if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) continue;
+
+    const x0 = xForTime(s);
+    const x1 = xForTime(e);
+    const w = Math.max(3, x1 - x0);
+
+    ctx.fillStyle = (ev.dept === "maintenance") ? fillMaint : fillMfg;
+    roundRect(x0, barY, w, barH, r);
+    ctx.fill();
+    ctx.stroke();
+
+    const base = ev.label || (ev.dept === "maintenance" ? "Maint" : "Mfg End");
+    const detail = ev.detail ? ` ${ev.detail}` : "";
+    const full = `${base}${detail}`;
+
+    // only draw text if it fits
+    let label = full;
+    if (ctx.measureText(label).width > (w - 10)) label = base;
+
+    if (w >= 40 && ctx.measureText(label).width <= (w - 10)) {
+      ctx.fillStyle = textCol;
+      ctx.fillText(label, x0 + w / 2, barY + barH / 2);
+    }
+  }
+
+  ctx.restore();
+}
+
 function drawTimeSeriesSingle(buckets, sizes, series, sel) {
   if (!canvas) return;
   const { line, label } = getTsLine(buckets, sizes, series, sel);
@@ -486,79 +558,6 @@ function drawTimeSeriesSingle(buckets, sizes, series, sel) {
     // small label at top
     ctx.fillText(lab, x, padT + 2);
   }
-
-    function drawEventBars(ctx, buckets, padL, padT, plotW, events) {
-    if (!Array.isArray(events) || events.length === 0) return;
-    if (!Array.isArray(buckets) || buckets.length < 2) return;
-
-    const rangeStart = Number(buckets[0]);
-    const rangeEnd = Number(buckets[buckets.length - 1]);
-    if (!Number.isFinite(rangeStart) || !Number.isFinite(rangeEnd) || rangeEnd <= rangeStart) return;
-
-    const xForTime = (tMs) => {
-      const tt = Math.max(rangeStart, Math.min(rangeEnd, Number(tMs)));
-      const p = (tt - rangeStart) / (rangeEnd - rangeStart);
-      return padL + plotW * p;
-    };
-
-    const barH = 14;
-    const barY = padT + 6; // near top of plot
-    const r = 6;
-
-    const fillMaint = isDark() ? "rgba(255,165,0,0.22)" : "rgba(255,140,0,0.22)";
-    const fillMfg   = isDark() ? "rgba(0,140,255,0.20)" : "rgba(0,102,204,0.18)";
-    const stroke    = isDark() ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.14)";
-    const textCol   = isDark() ? "rgba(255,255,255,0.88)" : "rgba(0,0,0,0.80)";
-
-    function roundRect(x, y, w, h, rr) {
-      const rad = Math.max(0, Math.min(rr, Math.min(w, h) / 2));
-      ctx.beginPath();
-      ctx.moveTo(x + rad, y);
-      ctx.arcTo(x + w, y, x + w, y + h, rad);
-      ctx.arcTo(x + w, y + h, x, y + h, rad);
-      ctx.arcTo(x, y + h, x, y, rad);
-      ctx.arcTo(x, y, x + w, y, rad);
-      ctx.closePath();
-    }
-
-    ctx.save();
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = stroke;
-    ctx.font = "11px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-
-    for (const ev of events) {
-      const s = Number(ev.startMs);
-      const e = Number(ev.endMs);
-      if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) continue;
-
-      const x0 = xForTime(s);
-      const x1 = xForTime(e);
-      const w = Math.max(3, x1 - x0);
-
-      ctx.fillStyle = (ev.dept === "maintenance") ? fillMaint : fillMfg;
-      roundRect(x0, barY, w, barH, r);
-      ctx.fill();
-      ctx.stroke();
-
-      const base = ev.label || (ev.dept === "maintenance" ? "Maint" : "Mfg End");
-      const detail = ev.detail ? ` ${ev.detail}` : "";
-      const full = `${base}${detail}`;
-
-      // only draw text if it fits
-      let label = full;
-      if (ctx.measureText(label).width > (w - 10)) label = base;
-
-      if (w >= 40 && ctx.measureText(label).width <= (w - 10)) {
-        ctx.fillStyle = textCol;
-        ctx.fillText(label, x0 + w / 2, barY + barH / 2);
-      }
-    }
-
-    ctx.restore();
-  }
-
 
   ctx.restore();
   }
