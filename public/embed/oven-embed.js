@@ -15,6 +15,9 @@
   const titleEl = document.getElementById("tvTitle");
   const metaEl = document.getElementById("tvMeta");
   const errEl = document.getElementById("tvError");
+  const shiftCardsEl = document.getElementById("shiftCards");
+  const kpiCardsEl = document.getElementById("kpiCards");
+
 
   // ---------- URL params ----------
   const params = new URLSearchParams(location.search);
@@ -23,6 +26,7 @@
   const sizeFilter = (params.get("size") || "ALL").toUpperCase();
   const titleOverride = params.get("title");
   const theme = (params.get("theme") || "light").toLowerCase();
+
 
   const deptParam = (params.get("dept") || "").toLowerCase();
 function deptLabel() {
@@ -206,9 +210,42 @@ function labelStoppedRuns(ctx, runs, padT, plotH, bucketMinutes) {
     return { start, end, label: "Last Hour" };
   }
 
+  function computePrevDayWindow(now = new Date()) {
+    const today = startOfDayLocal(now);
+    const start = new Date(today);
+    start.setDate(start.getDate() - 1); // yesterday 00:00
+    const end = new Date(today);        // today 00:00
+    return { start, end, label: "Previous Day" };
+  }
+
+  function computeThisShiftWindow(now = new Date()) {
+    const shifts = [5, 13, 21];
+    const today0 = startOfDayLocal(now);
+
+    let curStart = null;
+    for (const h of shifts) {
+      const c = new Date(today0.getFullYear(), today0.getMonth(), today0.getDate(), h, 0, 0, 0);
+      if (c <= now) curStart = c;
+    }
+
+    if (!curStart) {
+      const y = new Date(today0);
+      y.setDate(y.getDate() - 1);
+      curStart = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 21, 0, 0, 0);
+    }
+
+    const nextShift = new Date(curStart);
+    nextShift.setHours(curStart.getHours() + 8);
+
+    return { start: curStart, end: nextShift, label: "Current Shift" };
+  }
+
+
   function computeRangeFromParam() {
     if (rangeName === "prevweek") return computePrevWeekWindow();
     if (rangeName === "prevshift") return computePrevShiftWindow();
+    if (rangeName === "prevday") return computePrevDayWindow();
+    if (rangeName === "thisshift") return computeThisShiftWindow();
     return computeLastHourWindow();
   }
 
@@ -368,6 +405,28 @@ function labelStoppedRuns(ctx, runs, padT, plotH, bucketMinutes) {
     return (series[sizeFilter] || new Array(N).fill(0)).map(v => Number(v || 0));
   }
 
+    function computeShiftTotals(data) {
+    const buckets = data.buckets || [];
+    const sizes = data.sizes || [];
+    const series = data.series || {};
+
+    const totals = { 1: {}, 2: {}, 3: {} };
+    for (const sh of [1, 2, 3]) {
+      for (const s of sizes) totals[sh][s] = 0;
+    }
+
+    buckets.forEach((t, idx) => {
+      const d = new Date(t);
+      const sh = whichShift(d);
+      for (const s of sizes) {
+        totals[sh][s] += (series[s]?.[idx] || 0);
+      }
+    });
+
+    return totals;
+  }
+
+
   function computeMaxY(line) {
     let maxY = 0;
     for (const v of line) {
@@ -440,6 +499,159 @@ function labelStoppedRuns(ctx, runs, padT, plotH, bucketMinutes) {
     }
   }
 
+  function renderShiftTotalsChart(data, rangeObj) {
+  resizeCanvas();
+  const ctx = canvas.getContext("2d");
+
+  const padL = 120, padR = 40, padT = 330, padB = 80;
+  const W = canvas.width;
+  const H = canvas.height;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  const totals = computeShiftTotals(data);
+  const sizes = data.sizes || [];
+  const shifts = [1, 2, 3];
+
+  ctx.fillStyle = isLight() ? "#ffffff" : "#0f1419";
+  ctx.fillRect(0, 0, W, H);
+
+  const maxVal = Math.max(
+    5,
+    ...shifts.flatMap(sh => sizes.map(s => totals[sh][s] || 0))
+  );
+
+  const groupWidth = plotW / shifts.length;
+  const barWidth = groupWidth / (sizes.length + 1);
+
+  shifts.forEach((sh, si) => {
+    const groupX = padL + si * groupWidth;
+
+    sizes.forEach((s, bi) => {
+      const val = totals[sh][s] || 0;
+      const h = plotH * (val / maxVal);
+      const x = groupX + bi * barWidth + 10;
+      const y = padT + plotH - h;
+
+      ctx.fillStyle = isLight() ? "#1565c0" : "#4dabf7";
+      ctx.fillRect(x, y, barWidth * 0.8, h);
+
+      ctx.fillStyle = isLight() ? "#000" : "#fff";
+      ctx.font = `${Math.round(14 * (canvas.width / 1920))}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText(String(val), x + barWidth * 0.4, y - 6);
+    });
+
+    ctx.fillStyle = isLight() ? "#000" : "#fff";
+    ctx.font = `${Math.round(16 * (canvas.width / 1920))}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText(
+      `${sh} ${sh === 1 ? "st" : sh === 2 ? "nd" : "rd"} Shift`,
+      groupX + groupWidth / 2,
+      padT + plotH + 30
+    );
+  });
+}
+
+
+  const EMPTY_MOLD_SECONDS = 15;
+
+function fmtDuration(seconds) {
+  const s = Number(seconds || 0);
+  if (!Number.isFinite(s) || s <= 0) return "0m";
+  const mins = Math.round(s / 60);
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60), r = mins % 60;
+  return `${h}h ${r}m`;
+}
+
+function fmtMinutes(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  return `${Math.round(n * 10) / 10} min`;
+}
+
+// Similar to main oven.js “System Status” logic :contentReference[oaicite:7]{index=7}
+function computeSystemStatusFromData(data) {
+  const buckets = Array.isArray(data?.buckets) ? data.buckets : [];
+  const sizes = Array.isArray(data?.sizes) ? data.sizes : [];
+  const series = data?.series || {};
+  if (!buckets.length) return { status: "—", sinceMin: null };
+
+  let lastNonZeroIdx = -1;
+  for (let i = 0; i < buckets.length; i++) {
+    let total = 0;
+    for (const s of sizes) total += (series[s]?.[i] || 0);
+    if (total > 0) lastNonZeroIdx = i;
+  }
+
+  if (lastNonZeroIdx === -1) return { status: "Idle/Off", sinceMin: null };
+
+  const lastTs = new Date(buckets[lastNonZeroIdx]).getTime();
+  const sinceMin = Math.max(0, Math.round((Date.now() - lastTs) / 60000));
+  const status = sinceMin <= 10 ? "Running" : "Idle/Off";
+  return { status, sinceMin };
+}
+
+// Mirrors the card content from public/oven.js :contentReference[oaicite:8]{index=8}:contentReference[oaicite:9]{index=9}
+function renderKpis(kpis, data) {
+  if (!kpiCardsEl) return;
+
+  const filled = Number(kpis?.filledTotal);
+  const empty = Number(kpis?.emptyTotal);
+  const total = Number(kpis?.totalCycles);
+
+  const eff = (kpis?.efficiencyPct === null || kpis?.efficiencyPct === undefined)
+    ? "—" : `${kpis.efficiencyPct}%`;
+
+  const lost = fmtDuration(kpis?.lostSeconds);
+
+  const filledDisp = Number.isFinite(filled) ? filled : "—";
+  const emptyDisp = Number.isFinite(empty) ? empty : "—";
+  const totalDisp = Number.isFinite(total) ? total : "—";
+
+  const sys = computeSystemStatusFromData(data);
+  const sysText = (sys.sinceMin === null) ? sys.status : `${sys.status} (last ${sys.sinceMin}m)`;
+
+  const lastCure = fmtMinutes(kpis?.lastCureMinutes);
+  const avgCure = fmtMinutes(kpis?.avgCureMinutes);
+
+  kpiCardsEl.innerHTML = `
+    <div class="card">
+      <h3>System Status</h3>
+      <div class="muted">${sysText}</div>
+      <div class="muted" style="margin-top:6px;">Based on recent completions</div>
+    </div>
+
+    <div class="card">
+      <h3>Fill Efficiency</h3>
+      <div class="muted">${eff}</div>
+      <div class="muted" style="margin-top:6px;">Filled / Total</div>
+      <div class="muted">${filledDisp} / ${totalDisp}</div>
+    </div>
+
+    <div class="card">
+      <h3>Time Loss (Empty)</h3>
+      <div class="muted">${lost}</div>
+      <div class="muted" style="margin-top:6px;">Empty molds × ${EMPTY_MOLD_SECONDS}s</div>
+      <div class="muted">${emptyDisp} × ${EMPTY_MOLD_SECONDS}s</div>
+    </div>
+
+    <div class="card">
+      <h3>Last Cure Time</h3>
+      <div class="muted">${lastCure}</div>
+      <div class="muted" style="margin-top:6px;">Extract − Mold Close</div>
+    </div>
+
+    <div class="card">
+      <h3>Avg Cure Time</h3>
+      <div class="muted">${avgCure}</div>
+      <div class="muted" style="margin-top:6px;">Filled cycles in range</div>
+    </div>
+  `;
+}
+
+
   // ---------- data / render ----------
   let lastData = null;
 
@@ -469,12 +681,63 @@ function labelStoppedRuns(ctx, runs, padT, plotH, bucketMinutes) {
     return data;
   }
 
+    // ---- Shift logic (local) - matches public/oven.js ---- :contentReference[oaicite:5]{index=5}
+  function minutesSinceMidnight(d) { return d.getHours() * 60 + d.getMinutes(); }
+  function whichShift(localDate) {
+    const mins = minutesSinceMidnight(localDate);
+
+    // Shift 3: 21:00 -> 24:00 OR 00:00 -> 05:00
+    const s3Start = 21 * 60;
+    const s3End = 5 * 60;
+    if (mins >= s3Start || mins < s3End) return 3;
+
+    // Shift 2: 13:00 -> 21:00
+    const s2Start = 13 * 60;
+    const s2End = 21 * 60;
+    if (mins >= s2Start && mins < s2End) return 2;
+
+    // Shift 1: 05:00 -> 13:00
+    return 1;
+  }
+
+  // Same as renderShiftCards() from public/oven.js :contentReference[oaicite:6]{index=6}
+  function renderShiftCards(buckets, sizes, series) {
+    if (!shiftCardsEl) return;
+
+    const totals = { 1: {}, 2: {}, 3: {} };
+    for (const sh of [1, 2, 3]) for (const s of sizes) totals[sh][s] = 0;
+
+    buckets.forEach((t, idx) => {
+      const d = new Date(t);
+      const sh = whichShift(d);
+      for (const s of sizes) totals[sh][s] += (series[s]?.[idx] || 0);
+    });
+
+    shiftCardsEl.innerHTML = "";
+    [1, 2, 3].forEach((sh) => {
+      const card = document.createElement("div");
+      card.className = "card";
+
+      const h3 = document.createElement("h3");
+      h3.textContent = `${sh} ${sh === 1 ? "st" : sh === 2 ? "nd" : "rd"} Shift Total`;
+
+      const p = document.createElement("div");
+      p.className = "muted";
+      p.textContent = sizes.map((s) => `Size ${s}: ${totals[sh][s]}`).join("  |  ");
+
+      card.appendChild(h3);
+      card.appendChild(p);
+      shiftCardsEl.appendChild(card);
+    });
+  }
+
+
   function render(data, rangeObj) {
     resizeCanvas();
     const ctx = canvas.getContext("2d");
 
     const buckets = data.buckets || [];
-    const padL = 78, padR = 24, padT = 64, padB = 46; // leave room for heading overlay
+    const padL = 78, padR = 24, padT = 330, padB = 46; // leave room for heading overlay
     if (!buckets.length) {
       // blank
       ctx.fillStyle = isLight() ? "#fff" : "#0f1419";
@@ -482,7 +745,17 @@ function labelStoppedRuns(ctx, runs, padT, plotH, bucketMinutes) {
       return;
     }
 
+    renderShiftCards(buckets, data.sizes || [], data.series || {});
+
+    if (chartMode === "shifttotals") {
+      renderShiftTotalsChart(data, rangeObj);
+      renderKpis(data.kpis, data);
+      setHeading(rangeObj);
+      return;
+    }
+
     const line = lineForMode(data);
+
     const maxY = computeMaxY(line);
 
     drawAxesAndGrid(ctx, padL, padR, padT, padB, maxY);
@@ -505,7 +778,7 @@ function labelStoppedRuns(ctx, runs, padT, plotH, bucketMinutes) {
     // Optional: label downtime runs (matches your main page feature)
     const bucketMinutes = Number(data.bucketMinutes || BUCKET_MINUTES_DEFAULT);
     labelStoppedRuns(ctx, runs, padT, plotH, bucketMinutes);
-
+    renderKpis(data.kpis, data);
 
     setHeading(rangeObj);
   }

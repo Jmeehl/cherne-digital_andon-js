@@ -11,24 +11,28 @@
 </head>
 <body>
   <div id="wrap">
-    <iframe id="a" class="frame show" src="/embed/oven?dept=quality&chart=timeseries&range=lastHour"></iframe>
-    <iframe id="b" class="frame" src="about:blank"></iframe>
+    <iframe id="a" class="frame show" allow="autoplay" src="/embed/oven?dept=quality&chart=timeseries&range=lastHour"></iframe>
+    <iframe id="b" class="frame" allow="autoplay" src="about:blank"></iframe>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
     // -------- CONFIG --------
     const DEPT = "quality";
-    const DASHBOARD_URL = `/dashboard/${DEPT}`;
+    const DASHBOARD_URL = `/dashboard/${DEPT}?tv=1&sound=1`;
 
     const ROTATE_URLS = [
       `/embed/oven?dept=quality&chart=timeseries&range=lastHour&title=Oven Completions — Last Hour`,
       `/embed/oven?dept=quality&chart=timeseries&range=prevWeek&title=Oven Completions — Last Week`,
       `/embed/oven?dept=quality&chart=cureTimeseries&range=prevShift&title=Cure Time — Prev Shift`,
-      `/embed/oven?dept=quality&chart=cureTimeseries&range=prevWeek&size=2&title=Cure Time (Size 2) — Prev Week`
+      `/embed/oven?dept=quality&chart=cureTimeseries&range=prevWeek&size=2&title=Cure Time (Size 2) — Prev Week`,
+
+      `/embed/oven?dept=quality&chart=shiftTotals&range=prevWeek&title=Shift Totals — Last Week`,
+      `/embed/oven?dept=quality&chart=shiftTotals&range=prevDay&title=Shift Totals — Previous Day`,
+      `/embed/oven?dept=quality&chart=shiftTotals&range=thisShift&title=Shift Totals — Current Shift`
     ];
 
-    const ROTATE_EVERY_MS = 60 * 1000;
+    const ROTATE_EVERY_MS = 5 * 1000;
     const RETURN_COOLDOWN_MS = 15 * 1000;
     const FADE_MS = 1 * 1000; // transition speed
     // ------------------------

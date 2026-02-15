@@ -62,6 +62,21 @@ body{
   flex-wrap: nowrap;
 }
 
+/* TV mode: hide the top nav + tighten spacing */
+html.tv-mode #topnav {
+  display: none !important;
+}
+
+html.tv-mode .header {
+  padding-top: 10px; /* reduce the empty space where nav used to be */
+}
+
+/* Optional: hide the sound button on TV (sound enabled automatically) */
+html.tv-mode #soundToggle {
+  display: none !important;
+}
+
+
 .topnav .left,
 .topnav .right{
   display: flex;

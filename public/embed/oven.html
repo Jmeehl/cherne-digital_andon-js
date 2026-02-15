@@ -31,8 +31,8 @@
     /* Big full-screen canvas */
     canvas {
       display: block;
-      width: 95vw;
-      height: 85vh;
+      width: 98vw;
+      height: 98vh;
       background: var(--bg);
     }
 
@@ -74,6 +74,46 @@
       white-space: nowrap;
     }
 
+    .kpis.shiftkpis { top: 64px; }
+    .kpis:not(.shiftkpis) { top: 138px; } /* regular KPI row below shift row */
+
+    /* KPI row (same “card” concept as oven performance page) */
+    .kpis {
+      position: fixed;
+      left: 14px;
+      right: 14px;
+      top: 64px;              /* just below the title/meta */
+      z-index: 55;
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: nowrap;
+      pointer-events: none;   /* TV mode */
+    }
+
+    .kpis .card {
+      background: var(--panel);
+      color: var(--fg);
+      border-radius: 12px;
+      padding: 10px 12px;
+      min-width: 180px;
+      box-shadow: 0 6px 18px var(--shadow);
+    }
+
+    .kpis .card h3 {
+      margin: 0 0 6px 0;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+    }
+
+    .kpis .muted {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+
     .error {
       position: fixed;
       left: 14px;
@@ -105,6 +145,8 @@
   <canvas id="tvCanvas"></canvas>
 </div>
 
+<div class="kpis shiftkpis" id="shiftCards"></div>
+<div class="kpis" id="kpiCards"></div>
 
   <script src="/embed/oven-embed.js"></script>
 </body>

@@ -28,6 +28,12 @@ const soundToggleBtn = document.getElementById("soundToggle");
 const chime = new Audio("/assets/chime.mp3");
 chime.volume = 0.75;
 
+(function () {
+  const q = new URLSearchParams(location.search);
+  if (q.get("tv") === "1") document.documentElement.classList.add("tv-mode");
+})();
+
+
 // /dashboard/:dept
 const parts = location.pathname.split("/").filter(Boolean);
 const dept = parts[1] || "quality";
@@ -113,7 +119,8 @@ async function loadResponders() {
 /* =========================================================================
    Sound cadence
    ========================================================================= */
-let soundEnabled = false;
+const qs = new URLSearchParams(location.search);
+let soundEnabled = qs.get("sound") === "1"; // TV dashboard can force sound on
 let cadenceTimer = null;
 const CHIME_INTERVAL_MS = 150000;
 
@@ -130,6 +137,12 @@ async function playChime() {
   } catch {
     soundEnabled = false;
     setSoundButton();
+    // If sound=1, try to play immediately (works when kiosk allows autoplay)
+    if (soundEnabled) {
+      // Small delay gives the iframe/document time to settle
+      setTimeout(() => { playChime(); }, 250);
+    }
+
   }
 }
 

@@ -174,3 +174,7 @@
 {"type":"complete","ts":1770945126652,"dept":"maintenance","deptName":"Maintenance","cellId":"machine-shop","cellName":"Machine Shop","startedAt":1770930798639,"elapsedMs":14328013,"responderName":"Hollis Fritts","partNumber":"","result":"Resolved","note":"Fixed","ticketId":"mnt_1770930798639_9f6f75d5","progressStatus":"In progress","fiix":{"workOrderId":156597110,"workOrderNumber":"98078","url":"https://oateyscs.macmms.com","requestDescription":"broken","requestPriority":"Medium","requestAsset":"PUMA TT1800SY MILLTURN"}}
 {"type":"complete","ts":1771097105158,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","startedAt":1771096874484,"elapsedMs":230674,"responderName":"Bruce Baron","partNumber":"70019525","result":"Resolved","note":"","callId":"call_quality_1771096874484_afbe35f3","fiix":null}
 {"type":"cancel","ts":1771156686049,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":null}
+{"type":"cancel","ts":1771162207657,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":null}
+{"type":"cancel","ts":1771163531433,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":null}
+{"type":"cancel","ts":1771163770589,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":null}
+{"type":"cancel","ts":1771164080266,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":null}
