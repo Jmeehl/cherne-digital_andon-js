@@ -1147,7 +1147,13 @@ function buildOvenEventBars(rangeStartDate, rangeEndDate) {
         end?.by ??
         end?.name ??
         "",
-
+      result:
+        end?.result ??
+        end?.resolution ??
+        end?.notes ??
+        end?.comment ??
+        end?.message ??
+        "",
       // Optional extra fields if you have them
       priority: req?.priority ?? req?.fiix?.priority ?? "",
       cellId: req?.cellId ?? end?.cellId ?? "",
