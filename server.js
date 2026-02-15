@@ -979,6 +979,91 @@ app.get("/api/events", async (req, res) => {
   }
 });
 
+// Build oven “event bars” from the log stream by pairing request -> complete/cancel.
+// We only care about Maintenance and Mfg Eng right now.
+function buildOvenEventBars(rangeStartDate, rangeEndDate) {
+  const startMs = rangeStartDate.getTime();
+  const endMs = rangeEndDate.getTime();
+
+  // Pull more than the window so request/end can be paired even if one falls near edges
+  const logs = readLogs(20000);
+
+  const relevant = logs.filter((l) => {
+    const ts = Number(l?.ts);
+    if (!Number.isFinite(ts)) return false;
+
+    // small buffer around the time window
+    if (ts < startMs - 7 * 24 * 60 * 60 * 1000) return false;
+    if (ts > endMs + 7 * 24 * 60 * 60 * 1000) return false;
+
+    // Only Maintenance + Mfg Eng
+    if (l.dept !== "maintenance" && l.dept !== "mfg-eng") return false;
+
+    // Only lifecycle events
+    return (l.type === "request" || l.type === "complete" || l.type === "cancel");
+  });
+
+  // Pair by ID
+  const reqById = new Map(); // id -> request log
+  const endById = new Map(); // id -> earliest end log
+
+  for (const l of relevant) {
+    const dept = l.dept;
+    const id = (dept === "maintenance") ? l.ticketId : l.callId;
+    if (!id) continue;
+
+    if (l.type === "request") {
+      const cur = reqById.get(id);
+      if (!cur || Number(l.ts) < Number(cur.ts)) reqById.set(id, l);
+    } else {
+      const cur = endById.get(id);
+      if (!cur || Number(l.ts) < Number(cur.ts)) endById.set(id, l);
+    }
+  }
+
+  const bars = [];
+  for (const [id, req] of reqById.entries()) {
+    const dept = req.dept;
+    const reqTs = Number(req.ts);
+    const end = endById.get(id);
+    const endTs = end ? Number(end.ts) : null;
+
+    if (!Number.isFinite(reqTs)) continue;
+    const rawStart = reqTs;
+    const rawEnd = Number.isFinite(endTs) ? endTs : null;
+
+    // Clip to requested range
+    const clipStart = Math.max(startMs, rawStart);
+    const clipEnd = rawEnd === null ? Math.min(endMs, Date.now()) : Math.min(endMs, rawEnd);
+    if (clipEnd <= clipStart) continue;
+
+    const label = (dept === "maintenance") ? "Maint" : "Mfg End";
+
+    // If you have a Fiix ticket/workorder number, put it in detail (shown if bar is wide enough)
+    let detail = "";
+    if (dept === "maintenance") {
+      const woNum = req.fiix?.workOrderNumber ?? end?.fiix?.workOrderNumber ?? null;
+      const woId = req.fiix?.workOrderId ?? end?.fiix?.workOrderId ?? null;
+      if (woNum) detail = String(woNum);
+      else if (woId) detail = `#${woId}`;
+    }
+
+    bars.push({
+      id,
+      dept,
+      startMs: clipStart,
+      endMs: clipEnd,
+      label,
+      detail,
+      endType: end?.type ?? null
+    });
+  }
+
+  bars.sort((a, b) => (a.startMs - b.startMs) || ((b.endMs - b.startMs) - (a.endMs - a.startMs)));
+  return bars;
+}
+
+
 
 // --------------------
 // Oven APIs
@@ -1123,6 +1208,8 @@ app.get("/api/oven/plug-performance", async (req, res) => {
       });
     }
 
+    const eventBars = buildOvenEventBars(startB, new Date(endB.getTime() + bucketMs));
+
     res.json({
       ok: true,
       start: startB.toISOString(),
@@ -1132,7 +1219,8 @@ app.get("/api/oven/plug-performance", async (req, res) => {
       sizes,
       series,
       kpis,
-      cure: { buckets, sizes, series: cureSeries }
+      cure: { buckets, sizes, series: cureSeries },
+      events: eventBars
     });
   } catch (e) {
     // parseRange throws for bad inputs -> 400
@@ -1276,6 +1364,20 @@ app.post("/api/maintenance/request", async (req, res) => {
     fiix
   });
 
+  // Log request so oven chart can show a maintenance bar
+  appendLog({
+    type: "request",
+    ts: nowMs(),
+    dept: "maintenance",
+    deptName: DEPARTMENTS.find((d) => d.id === "maintenance")?.name,
+    cellId,
+    cellName,
+    ticketId,
+    fiix: fiix ?? null,
+    note: desc
+  });
+
+
   saveState(state);
   emitDept("maintenance");
   emitCell(cellId);
@@ -1314,6 +1416,18 @@ app.post("/api/request", (req, res) => {
   if (dept === "maintenance") return res.status(400).json({ ok: false, error: "Use /api/maintenance/request" });
 
   const callId = openSingleCall(dept, cellId);
+
+  // Log request so oven chart can show a dept call bar (ex: mfg-eng)
+    appendLog({
+      type: "request",
+      ts: nowMs(),
+      dept,
+      deptName: DEPARTMENTS.find((d) => d.id === dept)?.name,
+      cellId,
+      cellName: CELLS.find((c) => c.id === cellId)?.name,
+      callId
+    });
+
 
   saveState(state);
   emitDept(dept);

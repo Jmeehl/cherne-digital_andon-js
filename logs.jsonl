@@ -178,3 +178,4 @@
 {"type":"cancel","ts":1771163531433,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":null}
 {"type":"cancel","ts":1771163770589,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":null}
 {"type":"cancel","ts":1771164080266,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":null}
+{"type":"cancel","ts":1771177796911,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"baking","cellName":"Baking","callId":null}

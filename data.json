@@ -888,6 +888,23 @@
             "completedBy": "Hollis Fritts",
             "result": "Resolved",
             "solutionNote": "Moved motor shaft into correct position, reinstalled snap ring."
+          },
+          {
+            "ticketId": "mnt_1771177838853_b67f71fd",
+            "status": "OPEN",
+            "createdAt": 1771177838853,
+            "priority": "Medium",
+            "issue": "Event Bar Test",
+            "assetLabel": "BIG OVEN",
+            "progressStatus": "",
+            "fiix": {
+              "workOrderId": 156759297,
+              "workOrderNumber": "98116",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "Event Bar Test",
+              "requestPriority": "Medium",
+              "requestAsset": "BIG OVEN"
+            }
           }
         ]
       }
