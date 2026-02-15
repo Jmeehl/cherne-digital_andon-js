@@ -51,6 +51,8 @@ let lastOvenData = null;
 let hoverTsIndex = null;
 let hoverRAF = null;
 let pendingHoverIdx = null;
+let lastEventHitboxes = []; // [{x0,x1,y0,y1, ev}]
+
 
 // Last hour live mode
 let liveHourTimer = null;
@@ -374,6 +376,33 @@ function buildTimeSeriesLegendSingle(label) {
   dt.appendChild(sw2);
   dt.appendChild(document.createTextNode("Shaded = no completions (stopped/idle)"));
   legendEl.appendChild(dt);
+
+    // --- Event bar legend (NEW) ---
+  const evtWrap = document.createElement("div");
+  evtWrap.className = "item";
+  evtWrap.style.marginLeft = "12px";
+  evtWrap.style.fontWeight = "700";
+  evtWrap.appendChild(document.createTextNode("Events:"));
+  legendEl.appendChild(evtWrap);
+
+  const maintItem = document.createElement("div");
+  maintItem.className = "item";
+  const maintSw = document.createElement("span");
+  maintSw.className = "swatch";
+  maintSw.style.background = "rgba(255,140,0,0.85)";
+  maintItem.appendChild(maintSw);
+  maintItem.appendChild(document.createTextNode("Maintenance"));
+  legendEl.appendChild(maintItem);
+
+  const mfgItem = document.createElement("div");
+  mfgItem.className = "item";
+  const mfgSw = document.createElement("span");
+  mfgSw.className = "swatch";
+  mfgSw.style.background = "rgba(0,120,255,0.80)";
+  mfgItem.appendChild(mfgSw);
+  mfgItem.appendChild(document.createTextNode("Mfg Eng"));
+  legendEl.appendChild(mfgItem);
+
 }
 
 function computeStoppedMask(sizes, series, N) {
@@ -420,6 +449,8 @@ function shadeStopped(ctx, mask, padL, padT, plotW, plotH, N) {
 
 /* ---------- Event bars (Maintenance + Mfg End) ---------- */
 function drawEventBars(ctx, buckets, padL, padT, plotW, events) {
+  lastEventHitboxes = [];
+
   if (!Array.isArray(events) || events.length === 0) return;
   if (!Array.isArray(buckets) || buckets.length < 2) return;
 
@@ -433,14 +464,18 @@ function drawEventBars(ctx, buckets, padL, padT, plotW, events) {
     return padL + plotW * p;
   };
 
-  const barH = 14;
-  const barY = padT + 6; // near top of plot
-  const r = 6;
+  // Two lanes
+  const barH = 16;
+  const laneGap = 6;
+  const lane0Y = padT + 6;                // maintenance
+  const lane1Y = lane0Y + barH + laneGap; // mfg-eng
+  const r = 7;
 
-  const fillMaint = isDark() ? "rgba(255,165,0,0.22)" : "rgba(255,140,0,0.22)";
-  const fillMfg   = isDark() ? "rgba(0,140,255,0.20)" : "rgba(0,102,204,0.18)";
-  const stroke    = isDark() ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.14)";
-  const textCol   = isDark() ? "rgba(255,255,255,0.88)" : "rgba(0,0,0,0.80)";
+  // Bold colors
+  const fillMaint = isDark() ? "rgba(255,140,0,0.55)" : "rgba(255,140,0,0.55)";
+  const fillMfg   = isDark() ? "rgba(0,120,255,0.50)" : "rgba(0,120,255,0.50)";
+  const stroke    = isDark() ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.20)";
+  const textCol   = isDark() ? "rgba(255,255,255,0.95)" : "rgba(0,0,0,0.88)";
 
   function roundRect(x, y, w, h, rr) {
     const rad = Math.max(0, Math.min(rr, Math.min(w, h) / 2));
@@ -453,10 +488,12 @@ function drawEventBars(ctx, buckets, padL, padT, plotW, events) {
     ctx.closePath();
   }
 
+  const laneYForDept = (dept) => (dept === "maintenance" ? lane0Y : lane1Y);
+
   ctx.save();
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 1.25;
   ctx.strokeStyle = stroke;
-  ctx.font = "11px sans-serif";
+  ctx.font = "bold 12px sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
@@ -469,8 +506,17 @@ function drawEventBars(ctx, buckets, padL, padT, plotW, events) {
     const x1 = xForTime(e);
     const w = Math.max(3, x1 - x0);
 
+    const y = laneYForDept(ev.dept);
+
+    // record hitbox for hover detection
+    lastEventHitboxes.push({
+      x0, x1: x0 + w,
+      y0: y, y1: y + barH,
+      ev
+    });
+
     ctx.fillStyle = (ev.dept === "maintenance") ? fillMaint : fillMfg;
-    roundRect(x0, barY, w, barH, r);
+    roundRect(x0, y, w, barH, r);
     ctx.fill();
     ctx.stroke();
 
@@ -478,18 +524,18 @@ function drawEventBars(ctx, buckets, padL, padT, plotW, events) {
     const detail = ev.detail ? ` ${ev.detail}` : "";
     const full = `${base}${detail}`;
 
-    // only draw text if it fits
     let label = full;
     if (ctx.measureText(label).width > (w - 10)) label = base;
 
-    if (w >= 40 && ctx.measureText(label).width <= (w - 10)) {
+    if (w >= 46 && ctx.measureText(label).width <= (w - 10)) {
       ctx.fillStyle = textCol;
-      ctx.fillText(label, x0 + w / 2, barY + barH / 2);
+      ctx.fillText(label, x0 + w / 2, y + barH / 2);
     }
   }
 
   ctx.restore();
 }
+
 
 function shiftBoundaryLabel(d) {
   // assumes d is local Date
@@ -864,6 +910,47 @@ function showTooltipAt(clientX, clientY, html) {
   tooltipEl.style.top = `${top}px`;
 }
 
+function fmtLocal(tsMs) {
+  const d = new Date(Number(tsMs));
+  if (Number.isNaN(d.getTime())) return "—";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function eventTooltipHtml(ev) {
+  const deptName = ev.dept === "maintenance" ? "Maintenance" : "Mfg Eng";
+  const title = `${deptName}${ev.detail ? " — " + ev.detail : ""}`;
+
+  const status = (ev.status || "").toLowerCase();
+  const statusText = status === "complete" ? "Complete"
+                   : status === "cancel" ? "Canceled"
+                   : "Open";
+  const statusBg = isDark()
+    ? (status === "complete" ? "rgba(0,200,120,0.18)" : status === "cancel" ? "rgba(255,80,80,0.18)" : "rgba(255,200,0,0.18)")
+    : (status === "complete" ? "rgba(0,160,80,0.14)" : status === "cancel" ? "rgba(200,0,0,0.10)" : "rgba(180,140,0,0.12)");
+
+  const issue = ev.issue ? String(ev.issue) : "—";
+  const responder = ev.responder ? String(ev.responder) : "—";
+  const priority = ev.priority ? String(ev.priority) : null;
+
+  return `
+    <div style="font-weight:800;margin-bottom:6px">${title}</div>
+    <div style="display:inline-block;padding:2px 8px;border-radius:999px;font-weight:800;background:${statusBg}">
+      ${statusText}
+    </div>
+
+    <div style="margin-top:8px"><strong>Issue:</strong> ${issue}</div>
+    <div style="margin-top:4px"><strong>Responder:</strong> ${responder}</div>
+    ${priority ? `<div style="margin-top:4px"><strong>Priority:</strong> ${priority}</div>` : ""}
+
+    <div style="margin-top:8px;font-size:12px;opacity:0.85">
+      <div><strong>Start:</strong> ${fmtLocal(ev.startMs)}</div>
+      <div><strong>End:</strong> ${fmtLocal(ev.endMs)}</div>
+    </div>
+  `;
+}
+
+
 function hideTooltip() {
   if (!tooltipEl) return;
   tooltipEl.style.display = "none";
@@ -874,7 +961,19 @@ function onChartMouseMove(ev) {
   if (!canvas || !lastOvenData) return;
   const rect = canvas.getBoundingClientRect();
   const mouseX = ev.clientX - rect.left;
-
+  const mouseY = ev.clientY - rect.top;
+    // If hovering an event bar, show event tooltip instead of bucket tooltip
+    if (Array.isArray(lastEventHitboxes) && lastEventHitboxes.length) {
+      const hit = lastEventHitboxes.find(h =>
+        mouseX >= h.x0 && mouseX <= h.x1 &&
+        mouseY >= h.y0 && mouseY <= h.y1
+      );
+      if (hit) {
+        // keep crosshair from jumping when you're just reading an event
+        showTooltipAt(ev.clientX, ev.clientY, eventTooltipHtml(hit.ev));
+        return;
+      }
+    }
   const buckets = Array.isArray(lastOvenData.buckets) ? lastOvenData.buckets : [];
   if (!buckets.length) { hideTooltip(); return; }
 

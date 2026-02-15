@@ -1128,13 +1128,32 @@ function buildOvenEventBars(rangeStartDate, rangeEndDate) {
 
     bars.push({
       id,
-      dept,
+      dept,                         // "maintenance" or "mfg-eng"
       startMs: clipStart,
       endMs: clipEnd,
+
+      // Display
       label,
-      detail,
-      endType: end?.type ?? null
+      detail,                       // work order # if available
+
+      // Tooltip fields
+      status: end?.type ?? "open",  // "complete" | "cancel" | "open"
+      issue: req?.note ?? req?.issue ?? req?.desc ?? "",
+
+      // Who responded (best-effort: depends on what you log on completion)
+      responder:
+        end?.responderName ??
+        end?.responder ??
+        end?.by ??
+        end?.name ??
+        "",
+
+      // Optional extra fields if you have them
+      priority: req?.priority ?? req?.fiix?.priority ?? "",
+      cellId: req?.cellId ?? end?.cellId ?? "",
+      cellName: req?.cellName ?? end?.cellName ?? "",
     });
+
   }
 
   bars.sort((a, b) => (a.startMs - b.startMs) || ((b.endMs - b.startMs) - (a.endMs - a.startMs)));
@@ -1191,27 +1210,24 @@ app.get("/api/oven/plug-performance", async (req, res) => {
     const startB = floorToBucketLocal(start);
     const endB = floorToBucketLocal(end);
 
-    // Build continuous buckets as epoch milliseconds (numbers)
+    // Continuous numeric buckets (ms)
     const buckets = [];
-    for (let t = startB.getTime(); t <= endB.getTime(); t += bucketMs) {
-      buckets.push(t);
-    }
+    for (let t = startB.getTime(); t <= endB.getTime(); t += bucketMs) buckets.push(t);
 
-    // Pull filled vs empty counts (SQL rows are sparse)
+    // Filled vs empty (sparse SQL rows)
     const rows = await fetchOvenFillStats({
       startDate: startB,
-      endDate: new Date(endB.getTime() + bucketMs), // include last bucket window
+      endDate: new Date(endB.getTime() + bucketMs),
       bucketMinutes
     });
 
-    // Determine sizes (fallback to 1-4 if no data)
+    // Sizes (fallback)
     const sizeSet = new Set();
     for (const r of rows) sizeSet.add(String(r.PlugSize));
     const sizes = (sizeSet.size ? Array.from(sizeSet) : ["1", "2", "3", "4"])
       .sort((a, b) => Number(a) - Number(b));
 
-    // Build filled-only series + KPI totals
-    const filledMap = new Map(); // key: bucketMs|size -> count
+    const filledMap = new Map(); // `${bucketMs}|${size}` -> count
     let filledTotal = 0;
     let emptyTotal = 0;
 
@@ -1229,18 +1245,13 @@ app.get("/api/oven/plug-performance", async (req, res) => {
       }
     }
 
-    // Completions series aligned to continuous buckets (zero-filled)
+    // Completions series (zero-filled)
     const series = {};
-    for (const s of sizes) {
-      series[s] = buckets.map((b) => filledMap.get(`${b}|${s}`) ?? 0);
-    }
+    for (const s of sizes) series[s] = buckets.map((b) => filledMap.get(`${b}|${s}`) ?? 0);
 
     // KPIs
     const totalCycles = filledTotal + emptyTotal;
-    const efficiencyPct = totalCycles > 0
-      ? Math.round((filledTotal / totalCycles) * 1000) / 10
-      : null;
-
+    const efficiencyPct = totalCycles > 0 ? Math.round((filledTotal / totalCycles) * 1000) / 10 : null;
     const lostSeconds = emptyTotal * 15;
 
     const cureKpis = await fetchOvenCureKpis({
@@ -1258,23 +1269,21 @@ app.get("/api/oven/plug-performance", async (req, res) => {
       avgCureMinutes: cureKpis?.avgCureMinutes ?? null
     };
 
-    // Cure time series per 5-min bucket (AvgBakeMinutes), aligned to SAME numeric buckets
+    // Cure time series aligned to SAME numeric buckets
     const { rows: cureRows } = await fetchOvenRealtime({
       startDate: startB,
       endDate: new Date(endB.getTime() + bucketMs),
       bucketMinutes
     });
 
-    const cureAvgMap = new Map(); // key: bucketMs|size -> AvgBakeMinutes
+    const cureAvgMap = new Map(); // `${bucketMs}|${size}` -> AvgBakeMinutes
     for (const r of (cureRows || [])) {
       const b = floorToBucketLocal(r.BucketTime).getTime();
       const s = String(r.PlugSize);
-
       const v = r.AvgBakeMinutes;
       if (v === null || v === undefined) continue;
       const n = Number(v);
       if (!Number.isFinite(n)) continue;
-
       cureAvgMap.set(`${b}|${s}`, n);
     }
 
@@ -1282,36 +1291,30 @@ app.get("/api/oven/plug-performance", async (req, res) => {
     for (const s of sizes) {
       cureSeries[s] = buckets.map((b) => {
         const v = cureAvgMap.get(`${b}|${s}`);
-        return (v === undefined) ? null : v; // null = missing
+        return (v === undefined) ? null : v;
       });
     }
 
-    res.json({
-  ok: true,
-  start: startB.toISOString(),
-  end: endB.toISOString(),
-  bucketMinutes,
-  buckets,
-  sizes,
-  series,
-  kpis: {
-    filledTotal,
-    emptyTotal,
-    totalCycles,
-    efficiencyPct,
-    lostSeconds,
-    lastCureMinutes: cure.lastCureMinutes,
-    avgCureMinutes: cure.avgCureMinutes
-  },
-  cure: { buckets: cureBuckets, sizes: cureSizes, series: cureSeries },
-  events: eventBars
-});
-;
+    // Event bars: use your log-based pairing function (already in your server.js)
+    const events = buildOvenEventBars(startB, new Date(endB.getTime() + bucketMs));
+
+    return res.json({
+      ok: true,
+      start: startB.toISOString(),
+      end: endB.toISOString(),
+      bucketMinutes,
+      buckets,
+      sizes,
+      series,
+      kpis,
+      cure: { buckets, sizes, series: cureSeries },
+      events
+    });
   } catch (e) {
-    // parseRange throws for bad inputs -> 400
-    res.status(400).json({ ok: false, error: e?.message ?? String(e) });
+    return res.status(400).json({ ok: false, error: e?.message ?? String(e) });
   }
 });
+
 
 // --------------------
 // Mold APIs + page

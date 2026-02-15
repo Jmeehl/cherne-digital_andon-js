@@ -909,6 +909,27 @@
             "completedBy": "Hollis Fritts",
             "result": "Resolved",
             "solutionNote": ""
+          },
+          {
+            "ticketId": "mnt_1771187785970_6b73d9df",
+            "status": "COMPLETED",
+            "createdAt": 1771187785970,
+            "priority": "Medium",
+            "issue": "Event Bar Test",
+            "assetLabel": "BIG OVEN",
+            "progressStatus": "",
+            "fiix": {
+              "workOrderId": 156762526,
+              "workOrderNumber": "98117",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "Event Bar Test",
+              "requestPriority": "Medium",
+              "requestAsset": "BIG OVEN"
+            },
+            "completedAt": 1771190785875,
+            "completedBy": "Hollis Fritts",
+            "result": "Resolved",
+            "solutionNote": "Fixed lock station laser"
           }
         ]
       }
