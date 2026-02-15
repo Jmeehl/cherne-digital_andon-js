@@ -865,6 +865,84 @@ function completeMaintTicket(cellId, ticketId, completionMeta) {
   return t;
 }
 
+// ------------------------------------------------------------
+// Oven event bars (maintenance + mfg-eng) for plug-performance
+// ------------------------------------------------------------
+function overlaps(a0, a1, b0, b1) {
+  return a0 < b1 && a1 > b0;
+}
+
+function buildOvenEvents(startMs, endMs) {
+  const events = [];
+  const now = Date.now();
+
+  // 1) Maintenance tickets for the Baking cell (your state stores maintenance as tickets[])
+  // maintenance shape is ensured here: tickets list per cell :contentReference[oaicite:2]{index=2}
+  const bakingTickets = state.active?.maintenance?.baking?.tickets || [];
+  for (const t of bakingTickets) {
+    // createdAt exists for OPEN tickets and is used in snapshots :contentReference[oaicite:3]{index=3}
+    const s = t?.createdAt ? new Date(t.createdAt).getTime() : NaN;
+    const e = t?.completedAt ? new Date(t.completedAt).getTime() : now; // open ticket -> "ongoing"
+    if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) continue;
+    if (!overlaps(s, e, startMs, endMs)) continue;
+
+    const wo = t?.fiix?.workOrderNumber || t?.fiix?.fiixWorkOrderId || t?.ticketId || "";
+    events.push({
+      dept: "maintenance",
+      startMs: Math.max(s, startMs),
+      endMs: Math.min(e, endMs),
+      label: "Maint",
+      detail: wo ? String(wo) : ""
+    });
+  }
+
+  // 2) Mfg Engineering calls: use logs (completed calls live in logs.jsonl)
+  // NOTE: depending on your store.js signature, readLogs may be:
+  // - readLogs() -> all
+  // - readLogs("mfg-eng") -> just dept
+  // If yours differs, adjust this block accordingly.
+  let mfgLogs = [];
+  try {
+    const out = readLogs("mfg-eng"); // try dept-specific
+    mfgLogs = Array.isArray(out) ? out : (out?.logs || []);
+  } catch {
+    try {
+      const out = readLogs(); // fallback: all logs
+      const all = Array.isArray(out) ? out : (out?.logs || []);
+      mfgLogs = all.filter(x => x?.dept === "mfg-eng");
+    } catch {
+      mfgLogs = [];
+    }
+  }
+
+  for (const ev of mfgLogs) {
+    // We only want baking-related entries
+    if (ev?.cellId !== "baking") continue;
+
+    const s = ev?.startedAt ? new Date(ev.startedAt).getTime()
+            : ev?.requestedAt ? new Date(ev.requestedAt).getTime()
+            : ev?.ts ? new Date(ev.ts).getTime()
+            : NaN;
+
+    const e = ev?.ts ? new Date(ev.ts).getTime() : NaN; // complete timestamp
+    if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) continue;
+    if (!overlaps(s, e, startMs, endMs)) continue;
+
+    events.push({
+      dept: "mfg-eng",
+      startMs: Math.max(s, startMs),
+      endMs: Math.min(e, endMs),
+      label: "Mfg End",
+      detail: ev?.ticketId ? String(ev.ticketId) : ""
+    });
+  }
+
+  // Sort for consistent draw order
+  events.sort((a, b) => (a.startMs - b.startMs) || (a.endMs - b.endMs));
+  return events;
+}
+
+
 // ======================================================================
 // Routes
 // ======================================================================
@@ -1208,20 +1286,27 @@ app.get("/api/oven/plug-performance", async (req, res) => {
       });
     }
 
-    const eventBars = buildOvenEventBars(startB, new Date(endB.getTime() + bucketMs));
-
     res.json({
-      ok: true,
-      start: startB.toISOString(),
-      end: endB.toISOString(),
-      bucketMinutes,
-      buckets, // numeric ms
-      sizes,
-      series,
-      kpis,
-      cure: { buckets, sizes, series: cureSeries },
-      events: eventBars
-    });
+  ok: true,
+  start: startB.toISOString(),
+  end: endB.toISOString(),
+  bucketMinutes,
+  buckets,
+  sizes,
+  series,
+  kpis: {
+    filledTotal,
+    emptyTotal,
+    totalCycles,
+    efficiencyPct,
+    lostSeconds,
+    lastCureMinutes: cure.lastCureMinutes,
+    avgCureMinutes: cure.avgCureMinutes
+  },
+  cure: { buckets: cureBuckets, sizes: cureSizes, series: cureSeries },
+  events: eventBars
+});
+;
   } catch (e) {
     // parseRange throws for bad inputs -> 400
     res.status(400).json({ ok: false, error: e?.message ?? String(e) });

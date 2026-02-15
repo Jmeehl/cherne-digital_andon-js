@@ -179,3 +179,4 @@
 {"type":"cancel","ts":1771163770589,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":null}
 {"type":"cancel","ts":1771164080266,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":null}
 {"type":"cancel","ts":1771177796911,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"baking","cellName":"Baking","callId":null}
+{"type":"complete","ts":1771184042987,"dept":"maintenance","deptName":"Maintenance","cellId":"baking","cellName":"Baking","startedAt":1771177838853,"elapsedMs":6204134,"responderName":"Hollis Fritts","partNumber":"","result":"Resolved","note":"","ticketId":"mnt_1771177838853_b67f71fd","progressStatus":"","fiix":{"workOrderId":156759297,"workOrderNumber":"98116","url":"https://oateyscs.macmms.com","requestDescription":"Event Bar Test","requestPriority":"Medium","requestAsset":"BIG OVEN"}}

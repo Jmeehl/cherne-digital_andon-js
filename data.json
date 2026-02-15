@@ -891,7 +891,7 @@
           },
           {
             "ticketId": "mnt_1771177838853_b67f71fd",
-            "status": "OPEN",
+            "status": "COMPLETED",
             "createdAt": 1771177838853,
             "priority": "Medium",
             "issue": "Event Bar Test",
@@ -904,7 +904,11 @@
               "requestDescription": "Event Bar Test",
               "requestPriority": "Medium",
               "requestAsset": "BIG OVEN"
-            }
+            },
+            "completedAt": 1771184042987,
+            "completedBy": "Hollis Fritts",
+            "result": "Resolved",
+            "solutionNote": ""
           }
         ]
       }

@@ -25,16 +25,6 @@ const yesterdayBtn = document.getElementById("yesterdayBtn");
 const lastWeekBtn = document.getElementById("lastWeekBtn");
 const lastHourBtn = document.getElementById("lastHourBtn");
 const liveEl = document.getElementById("live");
-// Event bar settings (tweak colors to match your palette)
-const EVENT_COLORS = {
-  fiix: isDark() ? "rgba(255,170,120,0.96)" : "rgba(206,92,0,0.96)",
-  mfg:  isDark() ? "rgba(100,190,255,0.96)" : "rgba(10,90,180,0.96)"
-};
-const EVENT_TEXT_COLOR = isDark() ? "#000" : "#fff";
-const EVENT_BAR_HEIGHT_PX = 20; // adjust for TV vs desktop
-const EVENT_TOP_GAP = 10;
-const EVENT_MIN_PIXELS_FOR_TEXT = 60;
-
 
 const chartViewEl = document.getElementById("chartView");
 const tsSizeFilterEl = document.getElementById("tsSizeFilter");
@@ -78,6 +68,7 @@ const CURE_HIGH_MIN = 120;
 /* ---------- Utils ---------- */
 function pad(n) { return String(n).padStart(2, "0"); }
 function isDark() { return document.documentElement.classList.contains("theme-dark"); }
+function isLight() { return !isDark(); }
 
 function toLocalInputValue(d) {
   const x = new Date(d);
@@ -427,6 +418,7 @@ function shadeStopped(ctx, mask, padL, padT, plotW, plotH, N) {
   return runs;
 }
 
+/* ---------- Event bars (Maintenance + Mfg End) ---------- */
 function drawEventBars(ctx, buckets, padL, padT, plotW, events) {
   if (!Array.isArray(events) || events.length === 0) return;
   if (!Array.isArray(buckets) || buckets.length < 2) return;
@@ -499,6 +491,17 @@ function drawEventBars(ctx, buckets, padL, padT, plotW, events) {
   ctx.restore();
 }
 
+function shiftBoundaryLabel(d) {
+  // assumes d is local Date
+  const h = d.getHours();
+  const m = d.getMinutes();
+  if (m !== 0) return null;
+  if (h === 5) return "S1";
+  if (h === 13) return "S2";
+  if (h === 21) return "S3";
+  return null;
+}
+
 function drawTimeSeriesSingle(buckets, sizes, series, sel) {
   if (!canvas) return;
   const { line, label } = getTsLine(buckets, sizes, series, sel);
@@ -509,7 +512,7 @@ function drawTimeSeriesSingle(buckets, sizes, series, sel) {
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
   const N = buckets.length;
-  
+
   let maxY = 0;
   for (const v of line) maxY = Math.max(maxY, v);
   maxY = Math.max(5, Math.ceil(maxY * 1.15));
@@ -521,122 +524,106 @@ function drawTimeSeriesSingle(buckets, sizes, series, sel) {
   const stoppedMask = computeStoppedMask(sizes, series, N);
   const runs = shadeStopped(ctx, stoppedMask, padL, padT, plotW, plotH, N);
 
+  // Event bars (Maintenance + Mfg End) from API response
   if (lastOvenData?.events) {
-  drawEventBars(ctx, buckets, padL, padT, plotW, lastOvenData.events);
-}
+    drawEventBars(ctx, buckets, padL, padT, plotW, lastOvenData.events);
+  }
 
-
-    // ---- Shift boundary markers (05:00 / 13:00 / 21:00) ----
+  // ---- Shift boundary markers (05:00 / 13:00 / 21:00) ----
   if (N >= 2) {
-  ctx.save();
+    ctx.save();
 
-  // line style
-  ctx.strokeStyle = isDark() ? "rgba(247, 236, 236, 0.18)" : "rgba(228, 210, 210, 0.14)";
-  ctx.lineWidth = 3;
+    ctx.strokeStyle = isDark() ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.12)";
+    ctx.lineWidth = 2;
 
-  // label style (optional)
-  ctx.fillStyle = isDark() ? "rgba(20, 18, 18, 0.65)" : "rgba(22, 20, 20, 0.55)";
-  ctx.font = "11px sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
+    ctx.fillStyle = isDark() ? "rgba(255,255,255,0.70)" : "rgba(0,0,0,0.60)";
+    ctx.font = "11px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
 
-  const xFor = (i) => padL + plotW * (N === 1 ? 0 : i / (N - 1));
+    const xFor = (i) => padL + plotW * (N === 1 ? 0 : i / (N - 1));
 
-  for (let i = 0; i < N; i++) {
-    const d = new Date(buckets[i]);
-    const lab = shiftBoundaryLabel(d);
-    if (!lab) continue;
+    for (let i = 0; i < N; i++) {
+      const d = new Date(buckets[i]);
+      const lab = shiftBoundaryLabel(d);
+      if (!lab) continue;
 
-    const x = xFor(i);
+      const x = xFor(i);
 
-    // vertical line
-    ctx.beginPath();
-    ctx.moveTo(x, padT);
-    ctx.lineTo(x, padT + plotH);
-    ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, padT);
+      ctx.lineTo(x, padT + plotH);
+      ctx.stroke();
 
-    // small label at top
-    ctx.fillText(lab, x, padT + 2);
+      ctx.fillText(lab, x, padT + 2);
+    }
+
+    ctx.restore();
   }
 
-  ctx.restore();
-  }
-
-  // Label each shaded run with its duration
-  // Label each shaded run with its duration (dynamic sizing + vertical fallback)
+  // Label each shaded run with its duration (dynamic sizing + fallback)
   const bucketMinutes = Number(lastOvenData?.bucketMinutes ?? 5);
 
   ctx.save();
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-
-  for (const r of runs) {
-  const minutes = r.runLen * bucketMinutes;
-  // compact label: prefers "1h 5m" but for tight spaces uses "65m" or "1h"
-  function compactLabel(m) {
-    if (!Number.isFinite(m) || m <= 0) return "0m";
-    if (m < 60) return `${m}m`;
-    const h = Math.floor(m / 60);
-    const rem = m % 60;
-    return rem ? `${h}h ${rem}m` : `${h}h`;
-  }
-  const fullLabel = compactLabel(minutes);
-  const compactOne = (minutes >= 60 && (minutes % 60) !== 0)
-    ? `${Math.floor(minutes / 60)}h${minutes % 60}` // e.g. "1h5"
-    : `${minutes}m`;
-
-  // Choose base font size and compute available width
-  const maxWidth = r.x1 - r.x0 - 8; // allow small margin
-  const minFontPx = 9;
-  let fontPx = 12; // starting font size
   ctx.fillStyle = isDark() ? "rgba(255,255,255,0.78)" : "rgba(0,0,0,0.65)";
 
-  // Try fullLabel first, shrink if necessary
-  ctx.font = `${fontPx}px sans-serif`;
-  let measured = ctx.measureText(fullLabel).width;
+  for (const r of runs) {
+    const minutes = r.runLen * bucketMinutes;
 
-  while (measured > maxWidth && fontPx > minFontPx) {
-    fontPx -= 1;
+    function compactLabel(m) {
+      if (!Number.isFinite(m) || m <= 0) return "0m";
+      if (m < 60) return `${m}m`;
+      const h = Math.floor(m / 60);
+      const rem = m % 60;
+      return rem ? `${h}h ${rem}m` : `${h}h`;
+    }
+
+    const fullLabel = compactLabel(minutes);
+    const compactOne = (minutes >= 60 && (minutes % 60) !== 0)
+      ? `${Math.floor(minutes / 60)}h${minutes % 60}`
+      : `${minutes}m`;
+
+    const maxWidth = r.x1 - r.x0 - 8;
+    const minFontPx = 9;
+    let fontPx = 12;
+
     ctx.font = `${fontPx}px sans-serif`;
-    measured = ctx.measureText(fullLabel).width;
-  }
+    let measured = ctx.measureText(fullLabel).width;
 
-  const xMid = (r.x0 + r.x1) / 2;
-  const yMid = padT + plotH / 8;
+    while (measured > maxWidth && fontPx > minFontPx) {
+      fontPx -= 1;
+      ctx.font = `${fontPx}px sans-serif`;
+      measured = ctx.measureText(fullLabel).width;
+    }
 
-  if (measured <= maxWidth && (r.x1 - r.x0) >= 34) {
-    // fits horizontally — draw it
-    ctx.fillText(fullLabel, xMid, yMid);
-  } else {
-    // doesn't fit horizontally — try compactOne with smaller font
-    let compFont = Math.max(minFontPx, Math.min(11, fontPx));
-    ctx.font = `${compFont}px sans-serif`;
-    measured = ctx.measureText(compactOne).width;
-    if (measured <= maxWidth && (r.x1 - r.x0) >= 28) {
-      ctx.fillText(compactOne, xMid, yMid);
+    const xMid = (r.x0 + r.x1) / 2;
+    const yMid = padT + plotH / 8;
+
+    if (measured <= maxWidth && (r.x1 - r.x0) >= 34) {
+      ctx.fillText(fullLabel, xMid, yMid);
     } else {
-      // fallback: vertical (rotated) label centered in block
-      const verticalX = xMid;
-      const verticalY = yMid;
-      const vFont = Math.max(minFontPx, Math.min(11, compFont));
-      ctx.font = `${vFont}px sans-serif`;
-      const parts = compactOne.split(""); // single chars
-      // draw each char stacked
-      ctx.save();
-      ctx.translate(verticalX, verticalY);
-      // rotate so text reads top->bottom (clockwise)
-      ctx.rotate(-Math.PI / 2);
-      // draw horizontally rotated text (which appears vertical on screen)
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(compactOne, 0, 0);
-      ctx.restore();
+      let compFont = Math.max(minFontPx, Math.min(11, fontPx));
+      ctx.font = `${compFont}px sans-serif`;
+      measured = ctx.measureText(compactOne).width;
+
+      if (measured <= maxWidth && (r.x1 - r.x0) >= 28) {
+        ctx.fillText(compactOne, xMid, yMid);
+      } else {
+        // rotated fallback
+        const vFont = Math.max(minFontPx, Math.min(11, compFont));
+        ctx.font = `${vFont}px sans-serif`;
+
+        ctx.save();
+        ctx.translate(xMid, yMid);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText(compactOne, 0, 0);
+        ctx.restore();
+      }
     }
   }
-  }
   ctx.restore();
-
-
 
   // Grid
   ctx.strokeStyle = isDark() ? "rgba(255,255,255,0.10)" : "#e6e6e6";
@@ -695,25 +682,13 @@ function drawTimeSeriesSingle(buckets, sizes, series, sel) {
 }
 
 /* ---------- Tooltip: snap to nearest bucket on hover ---------- */
-
-// fallback formatter if not present
-if (typeof fmtDowntimeMinutes !== "function") {
-  function fmtDowntimeMinutes(mins) {
-    if (!Number.isFinite(mins) || mins <= 0) return "0m";
-    if (mins < 60) return `${mins}m`;
-    const h = Math.floor(mins / 60), m = mins % 60;
-    return m ? `${h}h ${m}m` : `${h}h`;
-  }
-}
-
 const tooltipEl = document.getElementById("chartTooltip");
 
 function formatIsoLocal(ts) {
   const d = new Date(Number(ts));
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-// Compute mapping from mouse X -> bucket index (uses same pads/geometry as draw function)
 function xToBucketIndex(canvasEl, mouseX, bucketsCount) {
   // MUST match drawTimeSeriesSingle padding
   const padL = 60, padR = 20;
@@ -728,13 +703,11 @@ function xToBucketIndex(canvasEl, mouseX, bucketsCount) {
 
 function drawCrosshairOnTimeSeries(idx) {
   if (!canvas || !lastOvenData) return;
-  const buckets = Array.isArray(lastOvenData.buckets) ? lastOvenData.buckets : [];
-  if (!buckets.length) return;
-
   const { buckets: b, sizes, series } = unpackSeries(lastOvenData);
+  if (!b.length) return;
+
   const sel = (tsSizeFilterEl?.value) || "ALL";
 
-  // match drawTimeSeriesSingle geometry
   const ctx = canvas.getContext("2d");
   const W = canvas.width, H = canvas.height;
   const padL = 60, padR = 20, padT = 18, padB = 44;
@@ -744,7 +717,6 @@ function drawCrosshairOnTimeSeries(idx) {
 
   if (idx < 0 || idx >= N) return;
 
-  // get the series value (same as chart)
   let yVal = 0;
   if (sel === "ALL") {
     yVal = sizes.reduce((t, s) => t + (series[s]?.[idx] || 0), 0);
@@ -752,7 +724,6 @@ function drawCrosshairOnTimeSeries(idx) {
     yVal = Number(series[sel]?.[idx] || 0);
   }
 
-  // recompute maxY like drawTimeSeriesSingle does
   const { line } = getTsLine(b, sizes, series, sel);
   let maxY = 0;
   for (const v of line) maxY = Math.max(maxY, v);
@@ -762,24 +733,19 @@ function drawCrosshairOnTimeSeries(idx) {
   const y = padT + plotH - (plotH * (yVal / maxY));
 
   ctx.save();
-
-  // crosshair style
   ctx.strokeStyle = isDark() ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)";
   ctx.lineWidth = 1;
 
-  // vertical line
   ctx.beginPath();
   ctx.moveTo(x, padT);
   ctx.lineTo(x, padT + plotH);
   ctx.stroke();
 
-  // horizontal line
   ctx.beginPath();
   ctx.moveTo(padL, y);
   ctx.lineTo(padL + plotW, y);
   ctx.stroke();
 
-  // dot at point
   ctx.fillStyle = isDark() ? "rgba(255,255,255,0.85)" : "rgba(0,0,0,0.75)";
   ctx.beginPath();
   ctx.arc(x, y, 3.5, 0, Math.PI * 2);
@@ -788,13 +754,10 @@ function drawCrosshairOnTimeSeries(idx) {
   ctx.restore();
 }
 
-
-// Find shaded run that contains index (based on stoppedMask)
 function findRunContainingIndex(sizes, series, idx) {
   const N = (series && sizes && sizes.length) ? (series[sizes[0]]?.length ?? 0) : 0;
   if (!N) return null;
 
-  // compute stopped mask for index ranges
   const mask = new Array(N).fill(false);
   for (let i = 0; i < N; i++) {
     let total = 0;
@@ -809,8 +772,6 @@ function findRunContainingIndex(sizes, series, idx) {
   return { i, j, runLen: j - i + 1 };
 }
 
-
-// Build tooltip HTML content for a specific bucket index
 function tooltipContentForIndex(idx) {
   if (!lastOvenData) return "";
   const buckets = Array.isArray(lastOvenData.buckets) ? lastOvenData.buckets : [];
@@ -820,10 +781,8 @@ function tooltipContentForIndex(idx) {
   if (idx < 0 || idx >= buckets.length) return "";
 
   const sel = (tsSizeFilterEl?.value) || "ALL";
-  // time
   const timeLocal = formatIsoLocal(buckets[idx]);
 
-  // completions
   let completions;
   if (sel === "ALL") {
     completions = sizes.reduce((t, s) => t + (series[s]?.[idx] || 0), 0);
@@ -831,13 +790,11 @@ function tooltipContentForIndex(idx) {
     completions = Number(series[sel]?.[idx] || 0);
   }
 
-  // downtime/run detection
   const run = findRunContainingIndex(sizes, series, idx);
   const bucketMinutes = Number(lastOvenData?.bucketMinutes ?? 5);
   const runMinutes = run ? (run.runLen * bucketMinutes) : 0;
   const isDown = !!run;
 
-  // cure value if present (aligned to same buckets)
   let cureVal = null;
   if (lastOvenData.cure && lastOvenData.cure.series) {
     const cureSeriesAll = lastOvenData.cure.series || {};
@@ -845,33 +802,30 @@ function tooltipContentForIndex(idx) {
     if (sKey) {
       cureVal = cureSeriesAll[sKey] ? cureSeriesAll[sKey][idx] : null;
     } else {
-      // average across sizes for this bucket
       const vals = (lastOvenData.cure.sizes || []).map(s => cureSeriesAll[s]?.[idx]).filter(v => v !== null && v !== undefined);
-      cureVal = vals.length ? (vals.reduce((a,b) => a+b,0) / vals.length) : null;
+      cureVal = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : null;
     }
   }
 
-  // Build HTML
   const parts = [];
   parts.push(`<div style="font-weight:700;margin-bottom:6px">${timeLocal}</div>`);
   parts.push(`<div>Completions: <strong>${completions}</strong></div>`);
+
   if (isDown) {
     const downColor = isDark() ? "#ffd0d0" : "#7a0000";
     const downBg = isDark() ? "rgba(255,80,80,0.12)" : "rgba(200,0,0,0.10)";
     parts.push(
-  `<div style="margin-top:6px;color:${downColor};font-weight:700;background:${downBg};display:inline-block;padding:2px 6px;border-radius:6px">
-     Downtime run: ${fmtDowntimeMinutes(runMinutes)}
-   </div>`
-);
+      `<div style="margin-top:6px;color:${downColor};font-weight:700;background:${downBg};display:inline-block;padding:2px 6px;border-radius:6px">
+         Downtime run: ${fmtDowntimeMinutes(runMinutes)}
+       </div>`
+    );
 
-    // show run buckets
     const startT = formatIsoLocal(lastOvenData.buckets[run.i]);
     const endT = formatIsoLocal(lastOvenData.buckets[run.j]);
     parts.push(`<div style="font-size:12px;color:#ddd">Run: ${startT} → ${endT}</div>`);
   } else {
     const runColor = isDark() ? "#cfe8ff" : "#003b7a";
     parts.push(`<div style="margin-top:6px;color:${runColor};font-weight:600">Running / has completions</div>`);
-
   }
 
   if (cureVal !== null && cureVal !== undefined) {
@@ -882,13 +836,11 @@ function tooltipContentForIndex(idx) {
   return parts.join("");
 }
 
-// Show tooltip at client coords (x,y) - keeps on-screen
 function showTooltipAt(clientX, clientY, html) {
   if (!tooltipEl) return;
   tooltipEl.innerHTML = html;
   tooltipEl.style.display = "block";
 
-  // adapt colors for theme
   if (isDark()) {
     tooltipEl.style.background = "rgba(20,20,24,0.92)";
     tooltipEl.style.color = "#fff";
@@ -897,64 +849,53 @@ function showTooltipAt(clientX, clientY, html) {
     tooltipEl.style.color = "#111";
   }
 
-  // Position with small offset
-  const pad = 12;
+  const padPx = 12;
   const rect = tooltipEl.getBoundingClientRect();
   let left = clientX + 16;
   let top = clientY + 12;
 
-  // keep on right if too close to right edge
-  if (left + rect.width + pad > window.innerWidth) left = clientX - rect.width - 16;
-  if (left < pad) left = pad;
+  if (left + rect.width + padPx > window.innerWidth) left = clientX - rect.width - 16;
+  if (left < padPx) left = padPx;
 
-  // keep above if too close to bottom
-  if (top + rect.height + pad > window.innerHeight) top = clientY - rect.height - 16;
-  if (top < pad) top = pad;
+  if (top + rect.height + padPx > window.innerHeight) top = clientY - rect.height - 16;
+  if (top < padPx) top = padPx;
 
   tooltipEl.style.left = `${left}px`;
   tooltipEl.style.top = `${top}px`;
 }
 
-// Hide tooltip
 function hideTooltip() {
   if (!tooltipEl) return;
   tooltipEl.style.display = "none";
   tooltipEl.innerHTML = "";
 }
 
-// Mouse handlers
 function onChartMouseMove(ev) {
   if (!canvas || !lastOvenData) return;
   const rect = canvas.getBoundingClientRect();
   const mouseX = ev.clientX - rect.left;
-  const mouseY = ev.clientY - rect.top;
 
   const buckets = Array.isArray(lastOvenData.buckets) ? lastOvenData.buckets : [];
   if (!buckets.length) { hideTooltip(); return; }
 
   const idx = xToBucketIndex(canvas, mouseX, buckets.length);
   const html = tooltipContentForIndex(idx);
-  // schedule redraw once per animation frame (prevents heavy redraw spam)
+
   pendingHoverIdx = idx;
-if (!hoverRAF) {
-  hoverRAF = requestAnimationFrame(() => {
-    hoverRAF = null;
-    if (pendingHoverIdx === null || pendingHoverIdx === undefined) return;
+  if (!hoverRAF) {
+    hoverRAF = requestAnimationFrame(() => {
+      hoverRAF = null;
+      if (pendingHoverIdx === null || pendingHoverIdx === undefined) return;
 
-    if (hoverTsIndex !== pendingHoverIdx) {
-      hoverTsIndex = pendingHoverIdx;
-      renderCurrentView();                 // redraw base chart
-      drawCrosshairOnTimeSeries(hoverTsIndex); // overlay crosshair
-    } else {
-      // even if same bucket, just redraw crosshair without full redraw if you want
-      // (usually unnecessary)
-    }
-  });
-}
-
+      if (hoverTsIndex !== pendingHoverIdx) {
+        hoverTsIndex = pendingHoverIdx;
+        renderCurrentView();
+        drawCrosshairOnTimeSeries(hoverTsIndex);
+      }
+    });
+  }
 
   if (!html) { hideTooltip(); return; }
-
   showTooltipAt(ev.clientX, ev.clientY, html);
 }
 
@@ -963,19 +904,16 @@ function onChartMouseLeave() {
   hoverTsIndex = null;
   if (hoverRAF) cancelAnimationFrame(hoverRAF);
   hoverRAF = null;
-  renderCurrentView(); // clears crosshair
+  renderCurrentView();
   hideTooltip();
 }
 
-
-// Attach listeners (safe: removes previous to avoid dupes)
 if (canvas) {
   canvas.removeEventListener("mousemove", onChartMouseMove);
   canvas.removeEventListener("mouseleave", onChartMouseLeave);
   canvas.addEventListener("mousemove", onChartMouseMove);
   canvas.addEventListener("mouseleave", onChartMouseLeave);
 }
-
 
 /* ---------- Cure time series ---------- */
 function drawCureTimeSeries(cure, selSize = "ALL") {
@@ -1012,7 +950,6 @@ function drawCureTimeSeries(cure, selSize = "ALL") {
   const plotH = H - padT - padB;
   const N = buckets.length;
 
-  // Y scaling includes goalposts
   let maxY = Math.max(CURE_HIGH_MIN, 5);
   let minY = Math.min(CURE_LOW_MIN, 0);
 
@@ -1038,7 +975,6 @@ function drawCureTimeSeries(cure, selSize = "ALL") {
   ctx.fillStyle = isDark() ? "#0f1419" : "#ffffff";
   ctx.fillRect(0, 0, W, H);
 
-  // grid
   ctx.strokeStyle = isDark() ? "rgba(255,255,255,0.10)" : "#e6e6e6";
   ctx.lineWidth = 1;
   const gridLines = 5;
@@ -1047,7 +983,6 @@ function drawCureTimeSeries(cure, selSize = "ALL") {
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
   }
 
-  // axes
   ctx.strokeStyle = isDark() ? "rgba(255,255,255,0.35)" : "#333";
   ctx.lineWidth = 1.5;
   ctx.beginPath();
@@ -1056,7 +991,6 @@ function drawCureTimeSeries(cure, selSize = "ALL") {
   ctx.lineTo(padL + plotW, padT + plotH);
   ctx.stroke();
 
-  // y labels
   ctx.fillStyle = isDark() ? "#e6e8ea" : "#333";
   ctx.font = "12px sans-serif";
   ctx.textAlign = "right";
@@ -1067,7 +1001,6 @@ function drawCureTimeSeries(cure, selSize = "ALL") {
     ctx.fillText(String(val), padL - 8, y);
   }
 
-  // x labels
   const step = Math.max(1, Math.floor(N / 12));
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
@@ -1077,7 +1010,6 @@ function drawCureTimeSeries(cure, selSize = "ALL") {
     ctx.fillText(`${pad(d.getHours())}:${pad(d.getMinutes())}`, x, padT + plotH + 10);
   }
 
-  // goalposts
   ctx.save();
   ctx.setLineDash([6, 6]);
   ctx.lineWidth = 2;
@@ -1090,7 +1022,6 @@ function drawCureTimeSeries(cure, selSize = "ALL") {
 
   ctx.restore();
 
-  // line (skip gaps)
   ctx.strokeStyle = COLORS[0];
   ctx.lineWidth = 3;
   ctx.beginPath();
@@ -1108,7 +1039,6 @@ function drawCureTimeSeries(cure, selSize = "ALL") {
   }
   ctx.stroke();
 
-  // title
   ctx.fillStyle = isDark() ? "#e6e8ea" : "#333";
   ctx.font = "13px sans-serif";
   ctx.textAlign = "left";
@@ -1265,7 +1195,6 @@ function drawGroupedBars(labels, seriesMap, sizeOrder, hintText) {
       ctx.fillStyle = COLORS[si % COLORS.length];
       ctx.fillRect(x0, y0, barW, h);
 
-      // label
       const label = String(v);
       ctx.font = "12px sans-serif";
       ctx.textAlign = "center";
@@ -1280,7 +1209,6 @@ function drawGroupedBars(labels, seriesMap, sizeOrder, hintText) {
       }
     });
 
-    // x label
     const xLabel = Math.round(xGroup + groupW / 2);
     const yLabel = Math.round(padT + plotH + 12);
     ctx.fillStyle = textColor;
@@ -1289,7 +1217,6 @@ function drawGroupedBars(labels, seriesMap, sizeOrder, hintText) {
     ctx.font = "12px sans-serif";
     ctx.fillText(labels[i], xLabel, yLabel);
 
-    // group total box
     const tot = totals[i];
     const boxText = String(tot);
     const paddingX = 8;
@@ -1313,7 +1240,6 @@ function drawGroupedBars(labels, seriesMap, sizeOrder, hintText) {
     ctx.fillText(boxText, Math.round(boxX + boxW / 2), Math.round(boxY + boxH / 2));
   }
 
-  // Legend pane
   shiftLegendEl.innerHTML = "";
   const wrap = document.createElement("div");
   wrap.style.display = "flex";
@@ -1474,7 +1400,6 @@ function buildOvenCsv() {
     for (let i = 0; i < cb.length; i++) {
       const row = [fmtIsoLocalLabel(cb[i])];
 
-      // per-size
       const vals = [];
       for (const s of cs) {
         const v = cseries[s]?.[i];
@@ -1482,7 +1407,6 @@ function buildOvenCsv() {
         if (v !== null && v !== undefined && Number.isFinite(Number(v))) vals.push(Number(v));
       }
 
-      // all-sizes avg
       const avg = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : "";
       row.push(avg === "" ? "" : Math.round(avg * 10) / 10);
 
@@ -1523,21 +1447,14 @@ function setChartMode(mode) {
   if (timeseriesSection) timeseriesSection.style.display = isTime ? "block" : "none";
   if (shiftBarsSection) shiftBarsSection.style.display = isTime ? "none" : "block";
 
-  // Size selector should show for both time series views
   if (tsSizeFilterEl?.parentElement) {
     tsSizeFilterEl.parentElement.style.display = isTime ? "block" : "none";
   }
 
-  // Shift cards only make sense for completions time series
   if (shiftCardsEl) shiftCardsEl.style.display = (mode === "timeseries") ? "flex" : "none";
-
-  // Cure section only for cureTimeseries
   if (cureSection) cureSection.style.display = (mode === "cureTimeseries") ? "block" : "none";
 
-  // Main completions canvas only for timeseries
   if (canvas) canvas.style.display = (mode === "timeseries") ? "block" : "none";
-
-  // Legend only for timeseries (you can add one for cure if you want)
   if (legendEl) legendEl.style.display = (mode === "timeseries") ? "flex" : "none";
 }
 
@@ -1584,7 +1501,6 @@ async function refresh() {
   } catch (e) {
     showError(e.message);
     renderKpis(null);
-    // If we had previous data, keep rendering something
     if (lastOvenData) {
       setChartMode(chartViewEl?.value || "timeseries");
       renderCurrentView();
@@ -1644,15 +1560,10 @@ liveEl?.addEventListener("change", () => {
 
 function rerenderForThemeChange() {
   if (!lastOvenData) return;
-
-  // Redraw charts/legends using current theme
   setChartMode(chartViewEl?.value || "timeseries");
   renderCurrentView();
-
-  // Repaint KPI cards if you want them to update too
   renderKpis(lastOvenData.kpis);
 }
-
 
 // Rolling last hour helpers
 function setLastHourRangeAndRefresh() {
@@ -1680,19 +1591,6 @@ function stopLiveLastHour() {
   lastHourBtn?.classList.remove("active");
 }
 
-function shiftBoundaryLabel(d) {
-  // assumes d is local Date
-  const h = d.getHours();
-  const m = d.getMinutes();
-  if (m !== 0) return null;
-  if (h === 5) return "S1";
-  if (h === 13) return "S2";
-  if (h === 21) return "S3";
-  return null;
-}
-
-
-
 lastHourBtn?.addEventListener("click", () => {
   if (!liveHourActive) {
     startLiveLastHour(60000);
@@ -1703,7 +1601,6 @@ lastHourBtn?.addEventListener("click", () => {
   }
 });
 
-// Stop rolling mode if user edits start/end manually
 [startEl, endEl].forEach(el => {
   el?.addEventListener("input", () => {
     if (liveHourActive) {
@@ -1724,33 +1621,30 @@ tsSizeFilterEl?.addEventListener("change", renderCurrentView);
 
 /* ---------- Init ---------- */
 (function init() {
-  // default to today's production day window
   const { start, end } = todayProdDayRange();
   setRange(start, end);
 
   setChartMode(chartViewEl?.value || "timeseries");
+
   (function watchThemeChanges() {
-  const root = document.documentElement;
-
-  // If your theme toggle changes a class on <html>, this will catch it
-  const obs = new MutationObserver((mutations) => {
-    for (const m of mutations) {
-      if (m.type === "attributes" && m.attributeName === "class") {
-        rerenderForThemeChange();
-        break;
+    const root = document.documentElement;
+    const obs = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.type === "attributes" && m.attributeName === "class") {
+          rerenderForThemeChange();
+          break;
+        }
       }
+    });
+    obs.observe(root, { attributes: true, attributeFilter: ["class"] });
+
+    const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
+    if (mq?.addEventListener) {
+      mq.addEventListener("change", () => rerenderForThemeChange());
+    } else if (mq?.addListener) {
+      mq.addListener(() => rerenderForThemeChange());
     }
-  });
-
-  obs.observe(root, { attributes: true, attributeFilter: ["class"] });
-
-  // Optional: also catch OS theme changes if you support "auto"
-  const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
-  if (mq?.addEventListener) {
-    mq.addEventListener("change", () => rerenderForThemeChange());
-  } else if (mq?.addListener) {
-    mq.addListener(() => rerenderForThemeChange());
-  }
   })();
+
   refresh();
 })();
