@@ -931,6 +931,7 @@ function eventTooltipHtml(ev) {
 
   const issue = ev.issue ? String(ev.issue) : "—";
   const responder = ev.responder ? String(ev.responder) : "—";
+  const result = ev.result ? String(ev.result) : null;
   const priority = ev.priority ? String(ev.priority) : null;
 
   return `
@@ -940,6 +941,7 @@ function eventTooltipHtml(ev) {
     </div>
 
     <div style="margin-top:8px"><strong>Issue:</strong> ${issue}</div>
+    ${result ? `<div style="margin-top:6px"><strong>Result:</strong> ${result}</div>` : ""}
     <div style="margin-top:4px"><strong>Responder:</strong> ${responder}</div>
     ${priority ? `<div style="margin-top:4px"><strong>Priority:</strong> ${priority}</div>` : ""}
 
