@@ -770,6 +770,27 @@
             "completedBy": "Hollis Fritts",
             "result": "Resolved",
             "solutionNote": "Fixed"
+          },
+          {
+            "ticketId": "mnt_1771283055448_1f51b027",
+            "status": "COMPLETED",
+            "createdAt": 1771283055448,
+            "priority": "Medium",
+            "issue": "I broke it.",
+            "assetLabel": "PUMA MX2100ST MILLTURN",
+            "progressStatus": "Needs approval",
+            "fiix": {
+              "workOrderId": 156880949,
+              "workOrderNumber": "98229",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "I broke it.",
+              "requestPriority": "Medium",
+              "requestAsset": "PUMA MX2100ST MILLTURN"
+            },
+            "completedAt": 1771284846434,
+            "completedBy": "Hollis Fritts",
+            "result": "Resolved",
+            "solutionNote": "Test"
           }
         ]
       },

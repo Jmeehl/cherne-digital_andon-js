@@ -188,3 +188,49 @@
 {"type":"cancel","ts":1771191809042,"dept":"supervisor","deptName":"Supervisor / Leads","cellId":"baking","cellName":"Baking","callId":"call_supervisor_1771191785360_11fc2d6b"}
 {"type":"request","ts":1771191812997,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"baking","cellName":"Baking","callId":"call_mfg-eng_1771191812997_451c807d"}
 {"type":"complete","ts":1771192006219,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"baking","cellName":"Baking","startedAt":1771191812997,"elapsedMs":193222,"responderName":"Jesse Meehl","partNumber":"","result":"Resolved","note":"Testing banner","callId":"call_mfg-eng_1771191812997_451c807d","fiix":null}
+{"type":"request","ts":1771267534674,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":"call_quality_1771267534674_381cb0d9"}
+{"type":"cancel","ts":1771271109530,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":null}
+{"type":"request","ts":1771275922497,"dept":"quality","deptName":"Quality","cellId":"baking","cellName":"Baking","callId":"call_quality_1771275922497_83bcbffd"}
+{"type":"cancel","ts":1771275927961,"dept":"quality","deptName":"Quality","cellId":"baking","cellName":"Baking","callId":null}
+{"type":"request","ts":1771281546540,"dept":"quality","deptName":"Quality","cellId":"baking","cellName":"Baking","callId":"call_quality_1771281546540_9a45f643"}
+{"type":"cancel","ts":1771281549596,"dept":"quality","deptName":"Quality","cellId":"baking","cellName":"Baking","callId":null}
+{"type":"request","ts":1771281566783,"dept":"quality","deptName":"Quality","cellId":"baking","cellName":"Baking","callId":"call_quality_1771281566783_ffdfb7cc"}
+{"type":"cancel","ts":1771281576221,"dept":"quality","deptName":"Quality","cellId":"baking","cellName":"Baking","callId":null}
+{"type":"request","ts":1771281579337,"dept":"quality","deptName":"Quality","cellId":"baking","cellName":"Baking","callId":"call_quality_1771281579337_11450ce9"}
+{"type":"cancel","ts":1771281583274,"dept":"quality","deptName":"Quality","cellId":"baking","cellName":"Baking","callId":null}
+{"type":"request","ts":1771281813254,"dept":"quality","deptName":"Quality","cellId":"baking","cellName":"Baking","callId":"call_quality_1771281813254_10f3fbfc"}
+{"type":"cancel","ts":1771281819687,"dept":"quality","deptName":"Quality","cellId":"baking","cellName":"Baking","callId":null}
+{"type":"request","ts":1771282987850,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":"call_quality_1771282987850_1c6f723b"}
+{"type":"cancel","ts":1771283012055,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":null}
+{"type":"request","ts":1771283055448,"dept":"maintenance","deptName":"Maintenance","cellId":"machine-shop","cellName":"Machine Shop","ticketId":"mnt_1771283055448_1f51b027","fiix":{"workOrderId":156880949,"workOrderNumber":"98229","url":"https://oateyscs.macmms.com","requestDescription":"I broke it.","requestPriority":"Medium","requestAsset":"PUMA MX2100ST MILLTURN"},"note":"I broke it."}
+{"type":"request","ts":1771283837402,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"clean-seal","cellName":"Clean Seal","callId":"call_mfg-eng_1771283837402_7c8daeff"}
+{"type":"complete","ts":1771284846434,"dept":"maintenance","deptName":"Maintenance","cellId":"machine-shop","cellName":"Machine Shop","startedAt":1771283055448,"elapsedMs":1790986,"responderName":"Hollis Fritts","partNumber":"","result":"Resolved","note":"Test","ticketId":"mnt_1771283055448_1f51b027","progressStatus":"Needs approval","fiix":{"workOrderId":156880949,"workOrderNumber":"98229","url":"https://oateyscs.macmms.com","requestDescription":"I broke it.","requestPriority":"Medium","requestAsset":"PUMA MX2100ST MILLTURN"}}
+{"type":"cancel","ts":1771284875305,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"clean-seal","cellName":"Clean Seal","callId":"call_mfg-eng_1771283837402_7c8daeff"}
+{"type":"request","ts":1771284906329,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"tubes-inserts","cellName":"Tubes & Inserts","callId":"call_mfg-eng_1771284906328_48eb8256"}
+{"type":"cancel","ts":1771284936108,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"tubes-inserts","cellName":"Tubes & Inserts","callId":"call_mfg-eng_1771284906328_48eb8256"}
+{"type":"request","ts":1771332090359,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"baking","cellName":"Baking","callId":"call_mfg-eng_1771332090359_523ee4cc"}
+{"type":"cancel","ts":1771332096288,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"baking","cellName":"Baking","callId":null}
+{"type":"request","ts":1771336667923,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"clean-seal","cellName":"Clean Seal","callId":"call_mfg-eng_1771336667923_a565f17f"}
+{"type":"cancel","ts":1771336676426,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"clean-seal","cellName":"Clean Seal","callId":null}
+{"type":"request","ts":1771336683350,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"clean-seal","cellName":"Clean Seal","callId":"call_mfg-eng_1771336683350_7362d508"}
+{"type":"cancel","ts":1771336689438,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"clean-seal","cellName":"Clean Seal","callId":null}
+{"type":"request","ts":1771336699033,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"clean-seal","cellName":"Clean Seal","callId":"call_mfg-eng_1771336699033_ed7aae76"}
+{"type":"cancel","ts":1771336706785,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"clean-seal","cellName":"Clean Seal","callId":null}
+{"type":"request","ts":1771336709385,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"clean-seal","cellName":"Clean Seal","callId":"call_mfg-eng_1771336709385_74fb69d5"}
+{"type":"cancel","ts":1771336715194,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"clean-seal","cellName":"Clean Seal","callId":null}
+{"type":"request","ts":1771336740514,"dept":"quality","deptName":"Quality","cellId":"clean-seal","cellName":"Clean Seal","callId":"call_quality_1771336740514_22334577"}
+{"type":"cancel","ts":1771336778338,"dept":"quality","deptName":"Quality","cellId":"clean-seal","cellName":"Clean Seal","callId":null}
+{"type":"request","ts":1771337103672,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":"call_quality_1771337103671_e9fecf7e"}
+{"type":"cancel","ts":1771337110607,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":null}
+{"type":"request","ts":1771337135503,"dept":"quality","deptName":"Quality","cellId":"clean-seal","cellName":"Clean Seal","callId":"call_quality_1771337135503_3a1085e3"}
+{"type":"cancel","ts":1771337146172,"dept":"quality","deptName":"Quality","cellId":"clean-seal","cellName":"Clean Seal","callId":null}
+{"type":"request","ts":1771337171810,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":"call_quality_1771337171810_f493884e"}
+{"type":"cancel","ts":1771337178682,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":null}
+{"type":"request","ts":1771337189610,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"machine-shop","cellName":"Machine Shop","callId":"call_mfg-eng_1771337189610_96c46eb0"}
+{"type":"cancel","ts":1771337199330,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"machine-shop","cellName":"Machine Shop","callId":null}
+{"type":"request","ts":1771337201206,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"machine-shop","cellName":"Machine Shop","callId":"call_mfg-eng_1771337201206_d14c8966"}
+{"type":"cancel","ts":1771337205810,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"machine-shop","cellName":"Machine Shop","callId":null}
+{"type":"request","ts":1771337233802,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":"call_quality_1771337233802_683c465f"}
+{"type":"cancel","ts":1771337239877,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":null}
+{"type":"request","ts":1771338806382,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"baking","cellName":"Baking","callId":"call_mfg-eng_1771338806382_05dae179"}
+{"type":"cancel","ts":1771339660738,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"baking","cellName":"Baking","callId":null}

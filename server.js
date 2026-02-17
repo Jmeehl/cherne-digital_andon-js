@@ -876,72 +876,118 @@ function buildOvenEvents(startMs, endMs) {
   const events = [];
   const now = Date.now();
 
-  // 1) Maintenance tickets for the Baking cell (your state stores maintenance as tickets[])
-  // maintenance shape is ensured here: tickets list per cell :contentReference[oaicite:2]{index=2}
+  const norm = (s) => String(s ?? "").trim().toLowerCase();
+  const isBigOven = (t) => {
+    const assetLabel = norm(t?.assetLabel);
+    const reqAsset = norm(t?.fiix?.requestAsset);
+    return assetLabel.includes("big oven") || reqAsset.includes("big oven");
+  };
+
+  // 1) OPEN maintenance tickets (from in-memory state) — ONLY Baking + Big Oven
   const bakingTickets = state.active?.maintenance?.baking?.tickets || [];
   for (const t of bakingTickets) {
-    // createdAt exists for OPEN tickets and is used in snapshots :contentReference[oaicite:3]{index=3}
-    const s = t?.createdAt ? new Date(t.createdAt).getTime() : NaN;
-    const e = t?.completedAt ? new Date(t.completedAt).getTime() : now; // open ticket -> "ongoing"
-    if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) continue;
+    if (!t) continue;
+    if (t.status !== "OPEN") continue;
+    if (!isBigOven(t)) continue;
+
+    const s = Number(t.createdAt ?? 0);
+    const e = now;
+
+    if (!Number.isFinite(s) || s <= 0) continue;
     if (!overlaps(s, e, startMs, endMs)) continue;
 
-    const wo = t?.fiix?.workOrderNumber || t?.fiix?.fiixWorkOrderId || t?.ticketId || "";
     events.push({
+      kind: "maintenance",
       dept: "maintenance",
-      startMs: Math.max(s, startMs),
-      endMs: Math.min(e, endMs),
-      label: "Maint",
-      detail: wo ? String(wo) : ""
+      deptName: "Maintenance",
+      cellId: "baking",
+      cellName: "Baking",
+      ticketId: t.ticketId ?? "",
+      workOrderNumber: t.fiix?.workOrderNumber ?? "",
+      issue: t.issue ?? t.fiix?.requestDescription ?? "",
+      result: t.result ?? "",
+      note: t.solutionNote ?? t.note ?? "",
+      responder: t.completedBy ?? "",
+      asset: t.assetLabel ?? t.fiix?.requestAsset ?? "",
+      startMs: s,
+      endMs: e,
+      status: "OPEN"
     });
   }
 
-  // 2) Mfg Engineering calls: use logs (completed calls live in logs.jsonl)
-  // NOTE: depending on your store.js signature, readLogs may be:
-  // - readLogs() -> all
-  // - readLogs("mfg-eng") -> just dept
-  // If yours differs, adjust this block accordingly.
-  let mfgLogs = [];
-  try {
-    const out = readLogs("mfg-eng"); // try dept-specific
-    mfgLogs = Array.isArray(out) ? out : (out?.logs || []);
-  } catch {
-    try {
-      const out = readLogs(); // fallback: all logs
-      const all = Array.isArray(out) ? out : (out?.logs || []);
-      mfgLogs = all.filter(x => x?.dept === "mfg-eng");
-    } catch {
-      mfgLogs = [];
+  // 2) COMPLETED/CANCELLED events from logs.jsonl — FILTERED
+  // COMPLETED/CANCELLED events from logs.jsonl — FILTERED
+  const logs = readLogs(); // whole history, we filter by time + cell/asset below
+
+  for (const l of logs) {
+    if (!l) continue;
+
+    // Normalize start/end times we might use
+    const s = Number(l.startedAt ?? l.createdAt ?? l.ts ?? 0);
+    const e = Number(l.ts ?? (s + (Number(l.elapsedMs ?? 0) || 0)));
+    if (!Number.isFinite(s) || !Number.isFinite(e) || s <= 0 || e <= 0) continue;
+    if (!overlaps(s, e, startMs, endMs)) continue;
+
+    // If this log is a cancel, skip it (we don't want canceled calls to show as bars)
+    if (l.type === "cancel") continue;
+
+    // Mfg Eng call completions — ONLY Baking
+    if (l.dept === "mfg-eng") {
+      if (l.cellId !== "baking") continue;
+
+      if (l.type === "complete") {
+        events.push({
+          kind: "mfg-eng",
+          dept: "mfg-eng",
+          deptName: l.deptName ?? "Manufacturing Engineering",
+          cellId: "baking",
+          cellName: l.cellName ?? "Baking",
+          callId: l.callId ?? "",
+          responder: l.responderName ?? "",
+          issue: "",
+          result: l.result ?? "",
+          note: l.note ?? "",
+          startMs: Number(l.startedAt ?? s),
+          endMs: Number(l.ts ?? e),
+          status: "COMPLETED"
+        });
+      }
+      continue;
+    }
+
+    // Maintenance ticket completions — ONLY Baking + Big Oven
+    if (l.dept === "maintenance") {
+      if (l.cellId !== "baking") continue;
+      if (!isBigOven(l)) continue;
+
+      if (l.type === "complete") {
+        events.push({
+          kind: "maintenance",
+          dept: "maintenance",
+          deptName: l.deptName ?? "Maintenance",
+          cellId: "baking",
+          cellName: l.cellName ?? "Baking",
+          ticketId: l.ticketId ?? "",
+          workOrderNumber: l.fiix?.workOrderNumber ?? "",
+          issue: l.fiix?.requestDescription ?? l.issue ?? "",
+          result: l.result ?? "",
+          note: l.note ?? "",
+          responder: l.responderName ?? "",
+          asset: l.fiix?.requestAsset ?? l.assetLabel ?? "",
+          startMs: Number(l.startedAt ?? s),
+          endMs: Number(l.ts ?? e),
+          status: "COMPLETED"
+        });
+      }
+      // intentionally do not handle 'cancel' here — cancels were skipped above
     }
   }
 
-  for (const ev of mfgLogs) {
-    // We only want baking-related entries
-    if (ev?.cellId !== "baking") continue;
 
-    const s = ev?.startedAt ? new Date(ev.startedAt).getTime()
-            : ev?.requestedAt ? new Date(ev.requestedAt).getTime()
-            : ev?.ts ? new Date(ev.ts).getTime()
-            : NaN;
-
-    const e = ev?.ts ? new Date(ev.ts).getTime() : NaN; // complete timestamp
-    if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) continue;
-    if (!overlaps(s, e, startMs, endMs)) continue;
-
-    events.push({
-      dept: "mfg-eng",
-      startMs: Math.max(s, startMs),
-      endMs: Math.min(e, endMs),
-      label: "Mfg End",
-      detail: ev?.ticketId ? String(ev.ticketId) : ""
-    });
-  }
-
-  // Sort for consistent draw order
-  events.sort((a, b) => (a.startMs - b.startMs) || (a.endMs - b.endMs));
+  // Sort by start time, stable
+  events.sort((a, b) => (a.startMs ?? 0) - (b.startMs ?? 0));
   return events;
 }
-
 
 // ======================================================================
 // Routes
@@ -1125,6 +1171,8 @@ function buildOvenEventBars(rangeStartDate, rangeEndDate) {
       if (woNum) detail = String(woNum);
       else if (woId) detail = `#${woId}`;
     }
+
+    if (end?.type === "cancel") continue;
 
     bars.push({
       id,
