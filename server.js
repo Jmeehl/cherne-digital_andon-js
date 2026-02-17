@@ -792,10 +792,20 @@ async function createFiixWorkOrderForMaintenance({ cellId, cellName, assetId, as
 function openSingleCall(dept, cellId) {
   const slot = state.active[dept][cellId];
   if (slot.status === "WAITING") return slot.callId;
+
   slot.status = "WAITING";
   slot.requestedAt = nowMs();
   slot.callId = makeId(`call_${dept}`);
   slot.fiix = null;
+
+  appendLog({
+    type: "call_open",
+    dept,
+    cellId,
+    callId: slot.callId,
+    ts: slot.requestedAt
+  });
+
   return slot.callId;
 }
 
@@ -803,12 +813,23 @@ function cancelSingleCall(dept, cellId, callId = null) {
   const slot = state.active[dept][cellId];
   if (slot.status !== "WAITING") return false;
   if (callId && slot.callId && callId !== slot.callId) return false;
+
+  // log BEFORE clearing
+  appendLog({
+    type: "call_cancel",
+    dept,
+    cellId,
+    callId: slot.callId,
+    ts: nowMs()
+  });
+
   slot.status = "READY";
   slot.requestedAt = null;
   slot.callId = null;
   slot.fiix = null;
   return true;
 }
+
 
 // Maintenance tickets
 function getMaintBucket(cellId) {
@@ -883,7 +904,9 @@ function buildOvenEvents(startMs, endMs) {
     return assetLabel.includes("big oven") || reqAsset.includes("big oven");
   };
 
+  // -----------------------------
   // 1) OPEN maintenance tickets (from in-memory state) — ONLY Baking + Big Oven
+  // -----------------------------
   const bakingTickets = state.active?.maintenance?.baking?.tickets || [];
   for (const t of bakingTickets) {
     if (!t) continue;
@@ -915,52 +938,143 @@ function buildOvenEvents(startMs, endMs) {
     });
   }
 
-  // 2) COMPLETED/CANCELLED events from logs.jsonl — FILTERED
-  // COMPLETED/CANCELLED events from logs.jsonl — FILTERED
-  const logs = readLogs(); // whole history, we filter by time + cell/asset below
+  // -----------------------------
+  // 2) COMPLETED/CANCELLED events from logs.jsonl — FILTERED + Mfg-Eng OPEN intervals that end on cancel
+  // -----------------------------
+  const logs = readLogs(); // whole history; we filter
 
+  // Helper to get a reasonable "start" timestamp from a log line
+  const getStart = (l) => Number(l?.startedAt ?? l?.createdAt ?? l?.ts ?? 0);
+  const getEndFromLine = (l, s) => {
+    const e1 = Number(l?.ts ?? 0);
+    if (Number.isFinite(e1) && e1 > 0) return e1;
+    const elapsed = Number(l?.elapsedMs ?? 0) || 0;
+    const e2 = Number(s + elapsed);
+    return Number.isFinite(e2) && e2 > 0 ? e2 : 0;
+  };
+
+      // ---- 2A) Build Mfg-Eng Baking call intervals (OPEN -> COMPLETE/CANCEL)
+      // Supports BOTH:
+      //   - new style: type in ["call_open","call_cancel","call_complete"]
+      //   - legacy style: type in ["request","cancel","complete"] (dept==="mfg-eng")
+      const callOpenTypes = new Set(["call_open", "open", "request", "requested"]);
+      const callCancelTypes = new Set(["call_cancel", "cancel", "canceled", "cancelled"]);
+      const callCompleteTypes = new Set(["call_complete", "complete", "completed"]);
+
+      // callId -> { openTs, openLog, endTs, endType, endLog }
+      const calls = new Map();
+
+      for (const l of logs) {
+        if (!l) continue;
+        if (l.dept !== "mfg-eng") continue;
+        if (l.cellId !== "baking") continue;
+
+        const callId = String(l.callId ?? "").trim();
+        if (!callId) continue;
+
+        const type = String(l.type ?? "").trim().toLowerCase();
+        const ts = Number(l.ts ?? 0);
+
+        // We ignore lines that don't have a usable timestamp at all
+        if (!Number.isFinite(ts) || ts <= 0) continue;
+
+        let rec = calls.get(callId);
+        if (!rec) {
+          rec = { openTs: 0, openLog: null, endTs: 0, endType: "", endLog: null };
+          calls.set(callId, rec);
+        }
+
+        // OPEN
+        if (callOpenTypes.has(type)) {
+          const s = getStart(l);
+          if (Number.isFinite(s) && s > 0) {
+            // Keep the earliest open timestamp (in case of dup writes)
+            if (!rec.openTs || s < rec.openTs) {
+              rec.openTs = s;
+              rec.openLog = l;
+            }
+          }
+          continue;
+        }
+
+        // CANCEL
+        if (callCancelTypes.has(type)) {
+          // Keep the earliest end timestamp (in case of dup writes)
+          if (!rec.endTs || ts < rec.endTs) {
+            rec.endTs = ts;
+            rec.endType = "CANCELLED";
+            rec.endLog = l;
+          }
+          continue;
+        }
+
+        // COMPLETE
+        if (callCompleteTypes.has(type)) {
+          if (!rec.endTs || ts < rec.endTs) {
+            rec.endTs = ts;
+            rec.endType = "COMPLETED";
+            rec.endLog = l;
+          }
+          continue;
+        }
+      }
+
+  // Emit Mfg-Eng events:
+  // - If cancelled: skip entirely (so the banner disappears after cancel)
+  // - If completed: show with endTs
+  // - If open: show running until now
+  for (const [callId, rec] of calls.entries()) {
+    const s = Number(rec.openTs || 0);
+    if (!Number.isFinite(s) || s <= 0) continue;
+
+    // If cancelled, do not show at all
+    if (rec.endType === "CANCELLED") continue;
+
+    const e = Number(rec.endTs || now);
+    if (!Number.isFinite(e) || e <= 0) continue;
+    if (!overlaps(s, e, startMs, endMs)) continue;
+
+    const openLine = rec.openLog || {};
+    const endLine = rec.endLog || {};
+
+    events.push({
+      kind: "mfg-eng",
+      dept: "mfg-eng",
+      deptName: openLine.deptName ?? "Manufacturing Engineering",
+      cellId: "baking",
+      cellName: openLine.cellName ?? "Baking",
+      callId,
+      responder: endLine.responderName ?? "",
+      issue: openLine.issue ?? "",
+      result: endLine.result ?? "",
+      note: endLine.note ?? "",
+      startMs: s,
+      endMs: e,
+      status: rec.endType || "OPEN"
+    });
+  }
+
+  // ---- 2B) Maintenance COMPLETED events from logs.jsonl — ONLY Baking + Big Oven
+  // Also supports your current "skip cancel bars" behavior.
   for (const l of logs) {
     if (!l) continue;
 
     // Normalize start/end times we might use
-    const s = Number(l.startedAt ?? l.createdAt ?? l.ts ?? 0);
-    const e = Number(l.ts ?? (s + (Number(l.elapsedMs ?? 0) || 0)));
+    const s = getStart(l);
+    const e = getEndFromLine(l, s);
+
     if (!Number.isFinite(s) || !Number.isFinite(e) || s <= 0 || e <= 0) continue;
     if (!overlaps(s, e, startMs, endMs)) continue;
 
-    // If this log is a cancel, skip it (we don't want canceled calls to show as bars)
-    if (l.type === "cancel") continue;
-
-    // Mfg Eng call completions — ONLY Baking
-    if (l.dept === "mfg-eng") {
-      if (l.cellId !== "baking") continue;
-
-      if (l.type === "complete") {
-        events.push({
-          kind: "mfg-eng",
-          dept: "mfg-eng",
-          deptName: l.deptName ?? "Manufacturing Engineering",
-          cellId: "baking",
-          cellName: l.cellName ?? "Baking",
-          callId: l.callId ?? "",
-          responder: l.responderName ?? "",
-          issue: "",
-          result: l.result ?? "",
-          note: l.note ?? "",
-          startMs: Number(l.startedAt ?? s),
-          endMs: Number(l.ts ?? e),
-          status: "COMPLETED"
-        });
-      }
-      continue;
-    }
+    // Skip cancels globally (as you already do) — we don't want canceled items drawn as bars
+    if (String(l.type ?? "").trim().toLowerCase() === "cancel") continue;
 
     // Maintenance ticket completions — ONLY Baking + Big Oven
     if (l.dept === "maintenance") {
       if (l.cellId !== "baking") continue;
       if (!isBigOven(l)) continue;
 
-      if (l.type === "complete") {
+      if (String(l.type ?? "").trim().toLowerCase() === "complete") {
         events.push({
           kind: "maintenance",
           dept: "maintenance",
@@ -979,15 +1093,14 @@ function buildOvenEvents(startMs, endMs) {
           status: "COMPLETED"
         });
       }
-      // intentionally do not handle 'cancel' here — cancels were skipped above
     }
   }
-
 
   // Sort by start time, stable
   events.sort((a, b) => (a.startMs ?? 0) - (b.startMs ?? 0));
   return events;
 }
+
 
 // ======================================================================
 // Routes
