@@ -37,52 +37,46 @@
     }
 
     /* Heading overlay */
-    .heading {
-      position: fixed;
-      left: 14px;
-      top: 10px;
-      right: 14px;
-      z-index: 50;
-      color: var(--fg);
-      pointer-events: none;
-      display: flex;
-      gap: 12px;
-      align-items: baseline;
-      justify-content: space-between;
+    .heading{
+      position:absolute;
+      top:14px;
+      left:50%;
+      transform:translateX(-50%);
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:4px;
+      z-index:5;
+      pointer-events:none;
+      text-align:center;
+      max-width:80%;
     }
-    .heading .title {
-      font-size: 26px;
-      font-weight: 800;
-      letter-spacing: 0.2px;
-      padding: 6px 10px;
-      border-radius: 10px;
-      background: var(--panel);
-      box-shadow: 0 6px 18px var(--shadow);
-      max-width: 78vw;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+    .heading .title{
+      font-weight:900;
+      font-size: clamp(22px, 2.2vw, 42px);
+      letter-spacing:0.4px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
-    .heading .meta {
-      font-size: 14px;
-      font-weight: 650;
-      color: var(--muted);
-      padding: 6px 10px;
-      border-radius: 10px;
-      background: var(--panel);
-      box-shadow: 0 6px 18px var(--shadow);
-      white-space: nowrap;
+    .heading .meta{
+      font-weight:600;
+      font-size: clamp(14px, 1.1vw, 20px);
+      color:var(--muted);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
 
-    .kpis.shiftkpis { top: 64px; }
-    .kpis:not(.shiftkpis) { top: 138px; } /* regular KPI row below shift row */
+    .kpis.shiftkpis { top: 100px; }
+    .kpis:not(.shiftkpis) { top: 175px; } /* regular KPI row below shift row */
 
     /* KPI row (same “card” concept as oven performance page) */
     .kpis {
       position: fixed;
       left: 14px;
       right: 14px;
-      top: 64px;              /* just below the title/meta */
+      top: 45px;              /* just below the title/meta */
       z-index: 55;
       display: flex;
       gap: 12px;

@@ -116,6 +116,107 @@ ensureStateShape();
 saveState(state);
 
 // ------------------------------------------------------------------
+// Webhook notifications (Teams channels etc.)
+// Configure via environment variables (WEBHOOK_MFG_ENG, WEBHOOK_MAINTENANCE)
+// or at runtime via the debug endpoint which persists into `state.webhooks`.
+// ------------------------------------------------------------------
+let WEBHOOK_MAP = {
+  "mfg-eng": (state.webhooks && state.webhooks["mfg-eng"]) || process.env.WEBHOOK_MFG_ENG || process.env.TEAMS_WEBHOOK_MFG_ENG || null,
+  "maintenance": (state.webhooks && state.webhooks["maintenance"]) || process.env.WEBHOOK_MAINTENANCE || null
+};
+
+function notifyDeptWebhook(dept, body) {
+  try {
+    const url = WEBHOOK_MAP[dept];
+    if (!url) return Promise.resolve({ ok: false, error: "no_webhook_configured" });
+    // Build an Adaptive Card payload for Microsoft Teams (attachments)
+    const buildCard = (evt, data) => {
+      const status = String(data.status ?? evt ?? "open").toLowerCase();
+      const statusColor = status === "cancel" || status === "cancelled" ? "attention"
+        : status === "complete" || status === "completed" ? "good"
+        : "warning";
+
+      const title = data.title || (data.event || "Event");
+      const facts = [];
+      if (data.cellName) facts.push({ title: "Cell", value: String(data.cellName) });
+      if (data.cellId) facts.push({ title: "Cell ID", value: String(data.cellId) });
+      if (data.ticketId) facts.push({ title: "Ticket", value: String(data.ticketId) });
+      if (data.callId) facts.push({ title: "Call", value: String(data.callId) });
+      if (data.note) facts.push({ title: "Note", value: String(data.note) });
+      if (data.fiix?.workOrderNumber) facts.push({ title: "WO", value: String(data.fiix.workOrderNumber) });
+      if (data.ts) facts.push({ title: "Time", value: new Date(Number(data.ts)).toLocaleString() });
+
+      const card = {
+        "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+        "type": "AdaptiveCard",
+        "version": "1.4",
+        "body": [
+          { "type": "TextBlock", "text": `${(data.dept || "").toUpperCase()} — ${title}`, "weight": "Bolder", "size": "Medium" },
+          { "type": "ColumnSet", "columns": [
+            { "type": "Column", "width": "stretch", "items": [ { "type": "FactSet", "facts": facts } ] },
+            { "type": "Column", "width": "auto", "items": [ { "type": "TextBlock", "text": String((data.status ?? "OPEN")).toUpperCase(), "weight": "Bolder", "color": statusColor } ] }
+          ] }
+        ]
+      };
+
+      // Add optional actions (link to Fiix)
+      if (data.fiix && data.fiix.url) {
+        const wo = data.fiix.workOrderNumber ? String(data.fiix.workOrderNumber) : null;
+        const href = data.fiix.url + (wo ? `/${wo}` : "");
+        card.actions = [ { "type": "Action.OpenUrl", "title": "Open Fiix", "url": href } ];
+      }
+
+      return card;
+    };
+
+    // POST with Adaptive Card attachment and return promise with result
+    return (async () => {
+      try {
+        const card = buildCard(body.event ?? body.type, body);
+        // Some Power Automate webhook endpoints expect the adaptive card JSON
+        // as a string field (e.g. 'adaptiveCard' or 'card'). Detect Power
+        // Automate endpoints and send the card as a string property to improve
+        // compatibility. Otherwise send a Teams-style attachment payload.
+        const isPowerAutomate = typeof url === 'string' && url.toLowerCase().includes('powerautomate');
+        let payload;
+        if (isPowerAutomate || process.env.FORCE_POWERAUTOMATE_MODE === '1') {
+          // Send minimal text payload for Power Automate to simplify flow handling
+          payload = {
+            text: String((body && (body.note || body.event)) ? (body.note || body.event) : ((body && body.dept) ? `${String(body.dept).toUpperCase()} notification` : 'Andon notification'))
+          };
+        } else {
+          payload = {
+            type: "message",
+            attachments: [ {
+              contentType: "application/vnd.microsoft.card.adaptive",
+              content: card
+            } ]
+          };
+        }
+
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const text = await resp.text().catch(() => "");
+        if (!resp.ok) {
+          console.error(`Webhook POST to ${dept} failed: ${resp.status}`);
+          return { ok: false, status: resp.status, text };
+        }
+        return { ok: true, status: resp.status, text };
+      } catch (e) {
+        console.error(`Webhook POST to ${dept} error:`, e?.message ?? e);
+        return { ok: false, error: e?.message ?? String(e) };
+      }
+    })();
+  } catch (e) {
+    console.error("notifyDeptWebhook error:", e?.message ?? e);
+    return Promise.resolve({ ok: false, error: e?.message ?? String(e) });
+  }
+}
+
+// ------------------------------------------------------------------
 // snapshots (dept + cell)
 // ------------------------------------------------------------------
 function deptSnapshot(dept) {
@@ -823,6 +924,16 @@ function cancelSingleCall(dept, cellId, callId = null) {
     ts: nowMs()
   });
 
+  // Notify webhook of cancel
+  notifyDeptWebhook(dept, {
+    event: "call.cancel",
+    ts: Date.now(),
+    dept,
+    cellId,
+    callId: slot.callId,
+    status: "cancelled"
+  });
+
   slot.status = "READY";
   slot.requestedAt = null;
   slot.callId = null;
@@ -1217,13 +1328,15 @@ app.get("/api/events", async (req, res) => {
 });
 
 // Build oven “event bars” from the log stream by pairing request -> complete/cancel.
-// We only care about Maintenance and Mfg Eng right now.
+  // We only care about Maintenance and Mfg Eng right now.
 function buildOvenEventBars(rangeStartDate, rangeEndDate) {
   const startMs = rangeStartDate.getTime();
   const endMs = rangeEndDate.getTime();
 
   // Pull more than the window so request/end can be paired even if one falls near edges
   const logs = readLogs(20000);
+
+  const callCancelTypes = new Set(["call_cancel", "cancel", "canceled", "cancelled"]);
 
   const relevant = logs.filter((l) => {
     const ts = Number(l?.ts);
@@ -1237,7 +1350,7 @@ function buildOvenEventBars(rangeStartDate, rangeEndDate) {
     if (l.dept !== "maintenance" && l.dept !== "mfg-eng") return false;
 
     // Only lifecycle events
-    return (l.type === "request" || l.type === "complete" || l.type === "cancel");
+    return (l.type === "request" || l.type === "complete" || callCancelTypes.has(l.type));
   });
 
   // Pair by ID
@@ -1285,7 +1398,7 @@ function buildOvenEventBars(rangeStartDate, rangeEndDate) {
       else if (woId) detail = `#${woId}`;
     }
 
-    if (end?.type === "cancel") continue;
+    if (callCancelTypes.has(end?.type)) continue;
 
     bars.push({
       id,
@@ -1358,14 +1471,26 @@ function parseRange(req) {
 // 5-minute bucket chart with continuous timeline + zero-filled gaps.
 // Adds KPIs: efficiency + time loss from empty molds + cure time KPIs.
 // Also returns cure time series (AvgBakeMinutes) aligned to the same bucket timeline.
+
+// Adaptive bucket sizing based on range duration
+function computeAdaptiveBucketMinutes(rangeMs) {
+  const hours = rangeMs / (60 * 60 * 1000);
+  if (hours <= 24) return 5;      // < 1 day: 5 min
+  if (hours <= 72) return 15;     // 1-3 days: 15 min
+  if (hours <= 168) return 30;    // 3-7 days: 30 min
+  if (hours <= 336) return 60;    // 7-14 days: 1 hour
+  return 120;                     // 14+ days: 2 hours
+}
+
 app.get("/api/oven/plug-performance", async (req, res) => {
   try {
     const { start, end } = parseRange(req);
 
-    const bucketMinutes = 5;
+    const rangeMs = end - start;
+    const bucketMinutes = computeAdaptiveBucketMinutes(rangeMs);
     const bucketMs = bucketMinutes * 60 * 1000;
 
-    // Floor timestamps to 5-min boundaries in LOCAL time
+    // Floor timestamps to bucket boundaries in LOCAL time
     const floorToBucketLocal = (d) => {
       const x = new Date(d);
       const mins = x.getMinutes();
@@ -1632,6 +1757,17 @@ app.post("/api/maintenance/request", async (req, res) => {
     note: desc
   });
 
+  // Notify department webhook (if configured)
+  notifyDeptWebhook("maintenance", {
+    event: "ticket.request",
+    ts: Date.now(),
+    dept: "maintenance",
+    cellId,
+    cellName,
+    ticketId,
+    note: desc,
+    fiix
+  });
 
   saveState(state);
   emitDept("maintenance");
@@ -1659,6 +1795,90 @@ app.post("/api/maintenance/ticket/status", (req, res) => {
   res.json({ ok: true });
 });
 
+// Simple webhook test endpoints (GET for quick checks, POST for custom payload)
+app.get("/api/webhook-test", (req, res) => {
+  const dept = String(req.query.dept || "mfg-eng").toLowerCase();
+  const sample = {
+    event: "test",
+    ts: Date.now(),
+    dept,
+    cellId: String(req.query.cellId || "test-cell"),
+    cellName: String(req.query.cellName || "Test Cell"),
+    ticketId: String(req.query.ticketId || "test-ticket"),
+    callId: String(req.query.callId || "test-call"),
+    note: String(req.query.note || "Webhook test from server (GET)"),
+    fiix: null,
+    status: "test"
+  };
+  notifyDeptWebhook(dept, sample).then((result) => {
+    res.json({ ok: true, sent: sample, result });
+  }).catch((err) => res.json({ ok: false, error: err?.message ?? String(err) }));
+});
+
+app.post("/api/webhook-test", (req, res) => {
+  const body = req.body ?? {};
+  const dept = String(body.dept || "mfg-eng").toLowerCase();
+  const sample = {
+    event: body.event || "test",
+    ts: Date.now(),
+    dept,
+    cellId: body.cellId || "test-cell",
+    cellName: body.cellName || "Test Cell",
+    ticketId: body.ticketId || null,
+    callId: body.callId || null,
+    note: body.note || "Webhook test from server (POST)",
+    fiix: body.fiix || null,
+    status: body.status || "test"
+  };
+  notifyDeptWebhook(dept, sample);
+  notifyDeptWebhook(dept, sample).then((result) => {
+    res.json({ ok: true, sent: sample, result });
+  }).catch((err) => res.json({ ok: false, error: err?.message ?? String(err) }));
+});
+
+// Debug: show configured webhook mapping (masked)
+app.get('/api/debug/webhooks', (req, res) => {
+  const masked = Object.fromEntries(Object.entries(WEBHOOK_MAP).map(([k, v]) => {
+    if (!v) return [k, null];
+    const len = v.length;
+    const start = v.slice(0, Math.min(16, len));
+    const end = v.slice(Math.max(0, len - 8));
+    return [k, `${start}...${end}`];
+  }));
+  res.json({ ok: true, webhooks: masked });
+});
+
+// Allow setting webhook URLs at runtime (persisted to `state.webhooks`)
+app.post('/api/debug/webhooks', (req, res) => {
+  const body = req.body || {};
+  const allowed = Object.keys(WEBHOOK_MAP);
+  const updates = {};
+
+  // Accept either { dept: 'mfg-eng', url: 'https://...' } or a map { 'mfg-eng': 'https://...', 'maintenance': null }
+  if (body.dept && Object.prototype.hasOwnProperty.call(body, 'url')) {
+    const d = String(body.dept).toLowerCase();
+    if (!allowed.includes(d)) return res.status(400).json({ ok: false, error: 'invalid dept' });
+    WEBHOOK_MAP[d] = body.url || null;
+    updates[d] = WEBHOOK_MAP[d];
+  } else {
+    for (const [k, v] of Object.entries(body)) {
+      const key = String(k).toLowerCase();
+      if (!allowed.includes(key)) continue;
+      WEBHOOK_MAP[key] = v || null;
+      updates[key] = WEBHOOK_MAP[key];
+    }
+  }
+
+  state.webhooks = state.webhooks || {};
+  for (const k of Object.keys(WEBHOOK_MAP)) state.webhooks[k] = WEBHOOK_MAP[k];
+  try { saveState(state); } catch (e) { console.error('Failed saving webhooks to state:', e?.message ?? e); }
+
+  const mask = (v) => { if (!v) return null; const len = v.length; return `${v.slice(0, Math.min(16, len))}...${v.slice(Math.max(0, len - 8))}`; };
+  const maskedUpdated = Object.fromEntries(Object.entries(updates).map(([k, v]) => [k, mask(v)]));
+  const maskedAll = Object.fromEntries(Object.entries(WEBHOOK_MAP).map(([k, v]) => [k, mask(v)]));
+  res.json({ ok: true, updated: maskedUpdated, webhooks: maskedAll });
+});
+
 // --------------------
 // Non-maint request/cancel/complete
 // --------------------
@@ -1683,6 +1903,15 @@ app.post("/api/request", (req, res) => {
       callId
     });
 
+  // Notify department webhook (if configured)
+  notifyDeptWebhook(dept, {
+    event: "call.request",
+    ts: Date.now(),
+    dept,
+    cellId,
+    cellName: CELLS.find((c) => c.id === cellId)?.name,
+    callId
+  });
 
   saveState(state);
   emitDept(dept);
@@ -1727,6 +1956,19 @@ app.post("/api/cancel", async (req, res) => {
       fiix: t.fiix ?? null,
       note: reason ?? ""
     });
+
+      // Notify webhook about maintenance ticket cancel
+      notifyDeptWebhook("maintenance", {
+        event: "ticket.cancel",
+        ts: Date.now(),
+        dept: "maintenance",
+        cellId,
+        cellName,
+        ticketId: t.ticketId,
+        note: reason ?? "",
+        fiix: t.fiix ?? null,
+        status: "cancelled"
+      });
 
     saveState(state);
     emitDept("maintenance");
@@ -1811,6 +2053,22 @@ app.post("/api/complete", async (req, res) => {
       fiix: t.fiix ?? null
     });
 
+    // Notify webhook about maintenance ticket completion
+    notifyDeptWebhook("maintenance", {
+      event: "ticket.complete",
+      ts: Date.now(),
+      dept: "maintenance",
+      cellId,
+      cellName,
+      ticketId: t.ticketId,
+      responderName: responder,
+      result: resu,
+      note: n,
+      elapsedMs,
+      fiix: t.fiix ?? null,
+      status: "completed"
+    });
+
     saveState(state);
     emitDept("maintenance");
     emitCell(cellId);
@@ -1839,6 +2097,22 @@ app.post("/api/complete", async (req, res) => {
     note: n,
     callId: slot.callId ?? null,
     fiix: slot.fiix ?? null
+  });
+
+  // Notify webhook about call completion
+  notifyDeptWebhook(dept, {
+    event: "call.complete",
+    ts: Date.now(),
+    dept,
+    cellId,
+    cellName: CELLS.find((c) => c.id === cellId)?.name,
+    callId: slot.callId ?? null,
+    responderName: responder,
+    result: resu,
+    note: n,
+    elapsedMs,
+    fiix: slot.fiix ?? null,
+    status: "completed"
   });
 
   slot.status = "READY";

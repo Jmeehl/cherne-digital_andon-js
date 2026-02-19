@@ -210,3 +210,68 @@
 {"type":"request","ts":1771363844502,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":"call_quality_1771363844502_6ec7f9b3"}
 {"type":"call_cancel","dept":"quality","cellId":"machine-shop","callId":"call_quality_1771363844502_6ec7f9b3","ts":1771363855505}
 {"type":"cancel","ts":1771363855505,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":null}
+{"type":"call_open","dept":"mfg-eng","cellId":"machine-shop","callId":"call_mfg-eng_1771371092103_2ec61f25","ts":1771371092103}
+{"type":"request","ts":1771371092104,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"machine-shop","cellName":"Machine Shop","callId":"call_mfg-eng_1771371092103_2ec61f25"}
+{"type":"complete","ts":1771371127621,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"machine-shop","cellName":"Machine Shop","startedAt":1771371092103,"elapsedMs":35518,"responderName":"Garrett Wosmek","partNumber":"","result":"Resolved","note":"","callId":"call_mfg-eng_1771371092103_2ec61f25","fiix":null}
+{"type":"call_open","dept":"quality","cellId":"baking","callId":"call_quality_1771371163552_84f52989","ts":1771371163552}
+{"type":"request","ts":1771371163552,"dept":"quality","deptName":"Quality","cellId":"baking","cellName":"Baking","callId":"call_quality_1771371163552_84f52989"}
+{"type":"call_cancel","dept":"quality","cellId":"baking","callId":"call_quality_1771371163552_84f52989","ts":1771371169532}
+{"type":"cancel","ts":1771371169533,"dept":"quality","deptName":"Quality","cellId":"baking","cellName":"Baking","callId":null}
+{"type":"call_open","dept":"quality","cellId":"baking","callId":"call_quality_1771371210941_0d6a614e","ts":1771371210941}
+{"type":"request","ts":1771371210941,"dept":"quality","deptName":"Quality","cellId":"baking","cellName":"Baking","callId":"call_quality_1771371210941_0d6a614e"}
+{"type":"call_cancel","dept":"quality","cellId":"baking","callId":"call_quality_1771371210941_0d6a614e","ts":1771371220908}
+{"type":"cancel","ts":1771371220909,"dept":"quality","deptName":"Quality","cellId":"baking","cellName":"Baking","callId":null}
+{"type":"call_open","dept":"quality","cellId":"baking","callId":"call_quality_1771371224954_0f166f0d","ts":1771371224954}
+{"type":"request","ts":1771371224954,"dept":"quality","deptName":"Quality","cellId":"baking","cellName":"Baking","callId":"call_quality_1771371224954_0f166f0d"}
+{"type":"call_cancel","dept":"quality","cellId":"baking","callId":"call_quality_1771371224954_0f166f0d","ts":1771371230035}
+{"type":"cancel","ts":1771371230036,"dept":"quality","deptName":"Quality","cellId":"baking","cellName":"Baking","callId":null}
+{"type":"call_open","dept":"mfg-eng","cellId":"baking","callId":"call_mfg-eng_1771453653079_d3f84cab","ts":1771453653079}
+{"type":"request","ts":1771453653080,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"baking","cellName":"Baking","callId":"call_mfg-eng_1771453653079_d3f84cab"}
+{"type":"request","ts":1771457706071,"dept":"maintenance","deptName":"Maintenance","cellId":"machine-shop","cellName":"Machine Shop","ticketId":"mnt_1771457706071_60dc8103","fiix":{"workOrderId":157038584,"workOrderNumber":"98276","url":"https://oateyscs.macmms.com","requestDescription":"Testing chime behavior","requestPriority":"Medium","requestAsset":"PUMA TT1800SY MILLTURN"},"note":"Testing chime behavior"}
+{"type":"complete","ts":1771458118945,"dept":"maintenance","deptName":"Maintenance","cellId":"machine-shop","cellName":"Machine Shop","startedAt":1771457706071,"elapsedMs":412874,"responderName":"Hollis Fritts","partNumber":"","result":"Resolved","note":"Test Completed","ticketId":"mnt_1771457706071_60dc8103","progressStatus":"Waiting for parts","fiix":{"workOrderId":157038584,"workOrderNumber":"98276","url":"https://oateyscs.macmms.com","requestDescription":"Testing chime behavior","requestPriority":"Medium","requestAsset":"PUMA TT1800SY MILLTURN"}}
+{"type":"call_cancel","dept":"mfg-eng","cellId":"baking","callId":"call_mfg-eng_1771453653079_d3f84cab","ts":1771458296885}
+{"type":"cancel","ts":1771458296886,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"baking","cellName":"Baking","callId":null}
+{"type":"call_open","dept":"mfg-eng","cellId":"baking","callId":"call_mfg-eng_1771458859820_dbd2ab87","ts":1771458859820}
+{"type":"request","ts":1771458859820,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"baking","cellName":"Baking","callId":"call_mfg-eng_1771458859820_dbd2ab87"}
+{"type":"call_cancel","dept":"mfg-eng","cellId":"baking","callId":"call_mfg-eng_1771458859820_dbd2ab87","ts":1771458897692}
+{"type":"cancel","ts":1771458897693,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"baking","cellName":"Baking","callId":null}
+{"type":"call_open","dept":"mfg-eng","cellId":"clean-seal","callId":"call_mfg-eng_1771466838201_3e66baa3","ts":1771466838201}
+{"type":"request","ts":1771466838201,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"clean-seal","cellName":"Clean Seal","callId":"call_mfg-eng_1771466838201_3e66baa3"}
+{"type":"call_cancel","dept":"mfg-eng","cellId":"clean-seal","callId":"call_mfg-eng_1771466838201_3e66baa3","ts":1771466895912}
+{"type":"cancel","ts":1771466895913,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"clean-seal","cellName":"Clean Seal","callId":null}
+{"type":"call_open","dept":"mfg-eng","cellId":"small-ball-assembly","callId":"call_mfg-eng_1771499271766_6adc3495","ts":1771499271766}
+{"type":"request","ts":1771499271766,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"small-ball-assembly","cellName":"Small Ball Assembly","callId":"call_mfg-eng_1771499271766_6adc3495"}
+{"type":"call_cancel","dept":"mfg-eng","cellId":"small-ball-assembly","callId":"call_mfg-eng_1771499271766_6adc3495","ts":1771499419564}
+{"type":"cancel","ts":1771499419564,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"small-ball-assembly","cellName":"Small Ball Assembly","callId":null}
+{"type":"call_open","dept":"mfg-eng","cellId":"small-ball-assembly","callId":"call_mfg-eng_1771500749763_649ca07c","ts":1771500749763}
+{"type":"request","ts":1771500749764,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"small-ball-assembly","cellName":"Small Ball Assembly","callId":"call_mfg-eng_1771500749763_649ca07c"}
+{"type":"call_cancel","dept":"mfg-eng","cellId":"small-ball-assembly","callId":"call_mfg-eng_1771500749763_649ca07c","ts":1771500769260}
+{"type":"cancel","ts":1771500769261,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"small-ball-assembly","cellName":"Small Ball Assembly","callId":null}
+{"type":"call_open","dept":"mfg-eng","cellId":"small-ball-assembly","callId":"call_mfg-eng_1771503143303_3e35b354","ts":1771503143303}
+{"type":"request","ts":1771503143304,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"small-ball-assembly","cellName":"Small Ball Assembly","callId":"call_mfg-eng_1771503143303_3e35b354"}
+{"type":"call_cancel","dept":"mfg-eng","cellId":"small-ball-assembly","callId":"call_mfg-eng_1771503143303_3e35b354","ts":1771503169156}
+{"type":"cancel","ts":1771503169156,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"small-ball-assembly","cellName":"Small Ball Assembly","callId":null}
+{"type":"call_open","dept":"mfg-eng","cellId":"tubes-inserts","callId":"call_mfg-eng_1771503175470_ad7e351b","ts":1771503175470}
+{"type":"request","ts":1771503175471,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"tubes-inserts","cellName":"Tubes & Inserts","callId":"call_mfg-eng_1771503175470_ad7e351b"}
+{"type":"call_cancel","dept":"mfg-eng","cellId":"tubes-inserts","callId":"call_mfg-eng_1771503175470_ad7e351b","ts":1771503197392}
+{"type":"cancel","ts":1771503197393,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"tubes-inserts","cellName":"Tubes & Inserts","callId":null}
+{"type":"call_open","dept":"mfg-eng","cellId":"clean-seal","callId":"call_mfg-eng_1771503382021_9ff40833","ts":1771503382021}
+{"type":"request","ts":1771503382022,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"clean-seal","cellName":"Clean Seal","callId":"call_mfg-eng_1771503382021_9ff40833"}
+{"type":"call_open","dept":"mfg-eng","cellId":"tubes-inserts","callId":"call_mfg-eng_1771504376012_f1b30f3d","ts":1771504376012}
+{"type":"request","ts":1771504376012,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"tubes-inserts","cellName":"Tubes & Inserts","callId":"call_mfg-eng_1771504376012_f1b30f3d"}
+{"type":"call_cancel","dept":"mfg-eng","cellId":"tubes-inserts","callId":"call_mfg-eng_1771504376012_f1b30f3d","ts":1771504512281}
+{"type":"cancel","ts":1771504512282,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"tubes-inserts","cellName":"Tubes & Inserts","callId":null}
+{"type":"call_open","dept":"mfg-eng","cellId":"tubes-inserts","callId":"call_mfg-eng_1771505199741_09c2a36e","ts":1771505199741}
+{"type":"request","ts":1771505199741,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"tubes-inserts","cellName":"Tubes & Inserts","callId":"call_mfg-eng_1771505199741_09c2a36e"}
+{"type":"call_cancel","dept":"mfg-eng","cellId":"tubes-inserts","callId":"call_mfg-eng_1771505199741_09c2a36e","ts":1771505217944}
+{"type":"cancel","ts":1771505217944,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"tubes-inserts","cellName":"Tubes & Inserts","callId":null}
+{"type":"complete","ts":1771505237134,"dept":"mfg-eng","deptName":"Manufacturing Engineering","cellId":"clean-seal","cellName":"Clean Seal","startedAt":1771503382021,"elapsedMs":1855113,"responderName":"Jesse Meehl","partNumber":"","result":"Resolved","note":"Test","callId":"call_mfg-eng_1771503382021_9ff40833","fiix":null}
+{"type":"call_open","dept":"quality","cellId":"baking","callId":"call_quality_1771506409212_3ca498a2","ts":1771506409212}
+{"type":"request","ts":1771506409214,"dept":"quality","deptName":"Quality","cellId":"baking","cellName":"Baking","callId":"call_quality_1771506409212_3ca498a2"}
+{"type":"call_cancel","dept":"quality","cellId":"baking","callId":"call_quality_1771506409212_3ca498a2","ts":1771507452578}
+{"type":"cancel","ts":1771507452579,"dept":"quality","deptName":"Quality","cellId":"baking","cellName":"Baking","callId":"call_quality_1771506409212_3ca498a2"}
+{"type":"call_open","dept":"quality","cellId":"machine-shop","callId":"call_quality_1771519786039_b2a0ca13","ts":1771519786039}
+{"type":"request","ts":1771519786040,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","callId":"call_quality_1771519786039_b2a0ca13"}
+{"type":"complete","ts":1771519824961,"dept":"quality","deptName":"Quality","cellId":"machine-shop","cellName":"Machine Shop","startedAt":1771519786039,"elapsedMs":38922,"responderName":"Fong Yang","partNumber":"123","result":"Resolved","note":"this is a test","callId":"call_quality_1771519786039_b2a0ca13","fiix":null}
+{"type":"request","ts":1771522797838,"dept":"maintenance","deptName":"Maintenance","cellId":"baking","cellName":"Baking","ticketId":"mnt_1771522797838_8c20a004","fiix":{"workOrderId":157098480,"workOrderNumber":"98299","url":"https://oateyscs.macmms.com","requestDescription":"6-8TB mold #2 needs to be inspected and parting line repaired.","requestPriority":"Medium","requestAsset":"PLACEHOLDER - Asset B (Baking)"},"note":"6-8TB mold #2 needs to be inspected and parting line repaired."}
+{"type":"complete","ts":1771525388412,"dept":"maintenance","deptName":"Maintenance","cellId":"baking","cellName":"Baking","startedAt":1771522797838,"elapsedMs":2590574,"responderName":"Hollis Fritts","partNumber":"","result":"Resolved","note":"Found sharp edges/wear at the mating surface of the mold.  Repaired and polished surface smooth.  Verified all vent holes cleaned and all rods in good order.","ticketId":"mnt_1771522797838_8c20a004","progressStatus":"In progress","fiix":{"workOrderId":157098480,"workOrderNumber":"98299","url":"https://oateyscs.macmms.com","requestDescription":"6-8TB mold #2 needs to be inspected and parting line repaired.","requestPriority":"Medium","requestAsset":"PLACEHOLDER - Asset B (Baking)"}}

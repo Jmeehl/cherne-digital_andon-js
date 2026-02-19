@@ -177,32 +177,37 @@ function labelStoppedRuns(ctx, runs, padT, plotH, bucketMinutes) {
   }
 
   // Range: prevShift using 05:00 / 13:00 / 21:00 boundaries
+  // Range: prevShift using 05:00 / 13:00 / 21:00 boundaries
   function computePrevShiftWindow(now = new Date()) {
     const shifts = [5, 13, 21];
     const today0 = startOfDayLocal(now);
 
+    // Find current shift start (the most recent boundary <= now)
     let curStart = null;
     for (const h of shifts) {
       const c = new Date(today0.getFullYear(), today0.getMonth(), today0.getDate(), h, 0, 0, 0);
       if (c <= now) curStart = c;
     }
+
+    // If we're between 00:00 and 05:00, current shift started yesterday at 21:00
     if (!curStart) {
-      const y = new Date(today0); y.setDate(y.getDate() - 1);
+      const y = new Date(today0);
+      y.setDate(y.getDate() - 1);
       curStart = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 21, 0, 0, 0);
     }
 
-    let prevStart;
-    if (curStart.getHours() === 5) {
-      const y = new Date(today0); y.setDate(y.getDate() - 1);
-      prevStart = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 21, 0, 0, 0);
-    } else if (curStart.getHours() === 13) {
-      prevStart = new Date(today0.getFullYear(), today0.getMonth(), today0.getDate(), 5, 0, 0, 0);
-    } else {
-      prevStart = new Date(today0.getFullYear(), today0.getMonth(), today0.getDate(), 13, 0, 0, 0);
+    // Previous shift is always exactly 8 hours earlier
+    const prevStart = new Date(curStart.getTime() - 8 * 60 * 60 * 1000);
+
+    // Safety: ensure ordering (should always be true now)
+    if (curStart.getTime() <= prevStart.getTime()) {
+      // fallback: go back 8 hours from end
+      return { start: new Date(curStart.getTime() - 8 * 60 * 60 * 1000), end: curStart, label: "Prev Shift" };
     }
 
     return { start: prevStart, end: curStart, label: "Prev Shift" };
   }
+
 
   function computeLastHourWindow(now = new Date()) {
     const end = now;
@@ -284,23 +289,39 @@ function labelStoppedRuns(ctx, runs, padT, plotH, bucketMinutes) {
   resizeCanvas();
 
   // ---------- drawing ----------
-  function drawAxesAndGrid(ctx, padL, padR, padT, padB, maxY) {
+    function drawAxesAndGrid(ctx, padL, padR, padT, padB, maxY) {
     const W = canvas.width, H = canvas.height;
     const plotW = W - padL - padR;
     const plotH = H - padT - padB;
 
-    // bg
-    ctx.fillStyle = isLight() ? "#ffffff" : "#0f1419";
+    // Base background (keep your existing light/dark behavior)
+    const bg = isLight() ? "#ffffff" : "#0f1419";
+    ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
 
-    const grid = isLight() ? "rgba(0,0,0,0.14)" : "rgba(255,255,255,0.10)";
-    const axis = isLight() ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.25)";
-    const text = isLight() ? "rgba(0,0,0,0.70)" : "rgba(255,255,255,0.70)";
+    // Subtle "plot area" gradient (adds style without changing headings)
+    ctx.save();
+    const g = ctx.createLinearGradient(0, padT, 0, padT + plotH);
+    if (isLight()) {
+      g.addColorStop(0.0, "rgba(21,101,192,0.08)");  // soft blue tint
+      g.addColorStop(0.5, "rgba(46,125,50,0.04)");   // soft green tint
+      g.addColorStop(1.0, "rgba(0,0,0,0.00)");
+    } else {
+      g.addColorStop(0.0, "rgba(77,171,247,0.10)");
+      g.addColorStop(0.6, "rgba(90,200,120,0.06)");
+      g.addColorStop(1.0, "rgba(0,0,0,0.00)");
+    }
+    ctx.fillStyle = g;
+    ctx.fillRect(padL, padT, plotW, plotH);
+    ctx.restore();
+
+    const grid = isLight() ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.10)";
+    const gridBold = isLight() ? "rgba(0,0,0,0.18)" : "rgba(255,255,255,0.16)";
+    const axis = isLight() ? "rgba(0,0,0,0.28)" : "rgba(255,255,255,0.28)";
+    const text = isLight() ? "rgba(0,0,0,0.70)" : "rgba(255,255,255,0.72)";
 
     // horizontal grid + y labels
-    ctx.strokeStyle = grid;
     ctx.lineWidth = 1;
-
     ctx.fillStyle = text;
     ctx.font = `${Math.round(12 * (canvas.width / 1920))}px sans-serif`;
     ctx.textAlign = "right";
@@ -309,6 +330,9 @@ function labelStoppedRuns(ctx, runs, padT, plotH, bucketMinutes) {
     const steps = 5;
     for (let i = 0; i <= steps; i++) {
       const y = padT + plotH * (i / steps);
+
+      // Make the midline slightly stronger (helps readability on TVs)
+      ctx.strokeStyle = (i === Math.floor(steps / 2)) ? gridBold : grid;
       ctx.beginPath();
       ctx.moveTo(padL, y);
       ctx.lineTo(padL + plotW, y);
@@ -327,6 +351,7 @@ function labelStoppedRuns(ctx, runs, padT, plotH, bucketMinutes) {
     ctx.lineTo(padL + plotW, padT + plotH);
     ctx.stroke();
   }
+
 
   function shiftBoundaryLabel(d) {
     const h = d.getHours();
@@ -434,76 +459,130 @@ function labelStoppedRuns(ctx, runs, padT, plotH, bucketMinutes) {
       maxY = Math.max(maxY, Number(v) || 0);
     }
     if (chartMode === "curetimeseries") {
-      // cure minutes scale
-      return Math.max(60, Math.ceil(maxY * 1.15));
+      // cure minutes scale, capped at 200 minutes
+      return Math.min(Math.max(60, Math.ceil(maxY * 1.15)), 200);
     }
     return Math.max(5, Math.ceil(maxY * 1.15));
   }
 
   function drawLine(ctx, buckets, line, padL, padR, padT, padB, maxY) {
-    const W = canvas.width, H = canvas.height;
-    const plotW = W - padL - padR;
-    const plotH = H - padT - padB;
-    const N = buckets.length;
-    if (N < 2) return;
+  const W = canvas.width, H = canvas.height;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const N = buckets.length;
+  if (N < 2) return;
 
-    const stroke = isLight() ? "rgba(0,0,0,0.80)" : "rgba(255,255,255,0.85)";
-    ctx.save();
-    ctx.strokeStyle = stroke;
-    ctx.lineWidth = 3;
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
+  // Pick an accent color (different for cure vs completions, and for light vs dark)
+  const accent = (chartMode === "curetimeseries")
+    ? (isLight() ? "rgba(46,125,50,1)" : "rgba(90,200,120,1)")
+    : (isLight() ? "rgba(21,101,192,1)" : "rgba(77,171,247,1)");
 
-    const xFor = (i) => padL + plotW * (i / (N - 1));
-    const yFor = (v) => padT + plotH - (plotH * (v / maxY));
+  const accentSoft = (chartMode === "curetimeseries")
+    ? (isLight() ? "rgba(46,125,50,0.18)" : "rgba(90,200,120,0.16)")
+    : (isLight() ? "rgba(21,101,192,0.18)" : "rgba(77,171,247,0.16)");
 
-    ctx.beginPath();
-    let started = false;
-    for (let i = 0; i < N; i++) {
-      const v = line[i];
-      if (v === null || v === undefined) continue;
-      const x = xFor(i);
-      const y = yFor(Number(v) || 0);
-      if (!started) {
-        ctx.moveTo(x, y);
-        started = true;
-      } else {
-        ctx.lineTo(x, y);
-      }
-    }
-    if (started) ctx.stroke();
-    ctx.restore();
+  const xFor = (i) => padL + plotW * (i / (N - 1));
+  const yFor = (v) => padT + plotH - (plotH * (v / maxY));
 
-    // optional goalposts for cure
-    if (chartMode === "curetimeseries") {
-      const low = 45, high = 120;
-      ctx.save();
-      ctx.strokeStyle = isLight() ? "rgba(0,120,0,0.35)" : "rgba(120,255,120,0.25)";
-      ctx.lineWidth = 2;
-      ctx.setLineDash([10, 8]);
-
-      const yLow = padT + plotH - (plotH * (low / maxY));
-      const yHigh = padT + plotH - (plotH * (high / maxY));
-      ctx.beginPath(); ctx.moveTo(padL, yLow); ctx.lineTo(padL + plotW, yLow); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(padL, yHigh); ctx.lineTo(padL + plotW, yHigh); ctx.stroke();
-
-      ctx.setLineDash([]);
-      ctx.fillStyle = isLight() ? "rgba(0,100,0,0.70)" : "rgba(170,255,170,0.60)";
-      ctx.font = `${Math.round(12 * (canvas.width / 1920))}px sans-serif`;
-      ctx.textAlign = "left";
-      ctx.textBaseline = "bottom";
-      ctx.fillText("Low 45m", padL + 6, yLow - 4);
-      ctx.textBaseline = "top";
-      ctx.fillText("High 120m", padL + 6, yHigh + 4);
-      ctx.restore();
-    }
+  // Build a clean path once
+  const pts = [];
+  for (let i = 0; i < N; i++) {
+    const v = line[i];
+    if (v === null || v === undefined) continue;
+    const clippedV = Math.min(Number(v) || 0, maxY);  // Clip values to maxY
+    pts.push({ x: xFor(i), y: yFor(clippedV), v: clippedV });
   }
+  if (pts.length < 2) return;
+
+  // --- Soft area fill under the line ---
+  ctx.save();
+  const fillGrad = ctx.createLinearGradient(0, padT, 0, padT + plotH);
+  fillGrad.addColorStop(0.0, accentSoft);
+  fillGrad.addColorStop(1.0, "rgba(0,0,0,0)");
+  ctx.fillStyle = fillGrad;
+
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, padT + plotH);
+  for (const p of pts) ctx.lineTo(p.x, p.y);
+  ctx.lineTo(pts[pts.length - 1].x, padT + plotH);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // --- Glow pass (behind the main stroke) ---
+  ctx.save();
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 10;
+  ctx.globalAlpha = isLight() ? 0.12 : 0.18;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.stroke();
+  ctx.restore();
+
+  // --- Main stroke ---
+  ctx.save();
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 3.5;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.stroke();
+  ctx.restore();
+
+  // --- Point markers (sparse, so it doesn't clutter) ---
+  ctx.save();
+  const dotEvery = Math.max(1, Math.floor(pts.length / 16)); // ~16 dots max
+  ctx.fillStyle = isLight() ? "rgba(255,255,255,0.95)" : "rgba(15,20,25,0.85)";
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 2;
+
+  for (let i = 0; i < pts.length; i += dotEvery) {
+    const p = pts[i];
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Keep your goalposts for cure (unchanged)
+  if (chartMode === "curetimeseries") {
+    const low = 45, high = 120;
+    ctx.save();
+    ctx.strokeStyle = isLight() ? "rgba(0,120,0,0.35)" : "rgba(120,255,120,0.25)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([10, 8]);
+
+    const yLow = padT + plotH - (plotH * (low / maxY));
+    const yHigh = padT + plotH - (plotH * (high / maxY));
+    ctx.beginPath(); ctx.moveTo(padL, yLow); ctx.lineTo(padL + plotW, yLow); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(padL, yHigh); ctx.lineTo(padL + plotW, yHigh); ctx.stroke();
+
+    ctx.setLineDash([]);
+    ctx.fillStyle = isLight() ? "rgba(0,100,0,0.70)" : "rgba(170,255,170,0.60)";
+    ctx.font = `${Math.round(12 * (canvas.width / 1920))}px sans-serif`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "bottom";
+    ctx.fillText("Low 45m", padL + 6, yLow - 4);
+    ctx.textBaseline = "top";
+    ctx.fillText("High 120m", padL + 6, yHigh + 4);
+    ctx.restore();
+  }
+}
+
 
   function renderShiftTotalsChart(data, rangeObj) {
   resizeCanvas();
   const ctx = canvas.getContext("2d");
 
-  const padL = 120, padR = 40, padT = 330, padB = 80;
+  const padL = 120, padR = 40, padT = 600, padB = 46;
   const W = canvas.width;
   const H = canvas.height;
   const plotW = W - padL - padR;
@@ -737,7 +816,7 @@ function renderKpis(kpis, data) {
     const ctx = canvas.getContext("2d");
 
     const buckets = data.buckets || [];
-    const padL = 78, padR = 24, padT = 330, padB = 46; // leave room for heading overlay
+    const padL = 78, padR = 24, padT = 575, padB = 46; // Chart Top - leave room for heading overlay
     if (!buckets.length) {
       // blank
       ctx.fillStyle = isLight() ? "#fff" : "#0f1419";

@@ -348,12 +348,15 @@ function renderMaintenance(snapshot) {
   const now = snapshot?.now ?? Date.now();
   const tickets = Array.isArray(snapshot?.tickets) ? snapshot.tickets : [];
 
-  if (tickets.length) startCadence(); else stopCadence();
+  // Only chime for tickets that don't have a status set yet
+  const pendingTickets = tickets.filter(t => !String(t.progressStatus ?? "").trim());
+  if (pendingTickets.length) startCadence(); else stopCadence();
 
   if (subhead) {
     const oldest = tickets.length ? Math.min(...tickets.map(t => now - (t.createdAt ?? now))) : 0;
+    const pendingCount = pendingTickets.length;
     subhead.innerHTML = tickets.length
-      ? `<span class="alert">Active Tickets: ${tickets.length} Oldest: ${escapeHtml(fmtElapsed(oldest))}</span>`
+      ? `<span class="alert">Active Tickets: ${tickets.length} (${pendingCount} pending) Oldest: ${escapeHtml(fmtElapsed(oldest))}</span>`
       : `Active Tickets: 0`;
   }
 

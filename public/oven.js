@@ -247,7 +247,7 @@ function computeSystemStatusFromSeries() {
 }
 
 /* ---------- KPIs ---------- */
-function renderKpis(kpis) {
+function renderKpis(kpis, bucketMinutes) {
   if (!kpiCardsEl) return;
 
   const filled = Number(kpis?.filledTotal);
@@ -265,6 +265,7 @@ function renderKpis(kpis) {
 
   const sys = computeSystemStatusFromSeries();
   const sysText = (sys.sinceMin === null) ? sys.status : `${sys.status} (last ${sys.sinceMin}m)`;
+  const bucketText = bucketMinutes ? `${bucketMinutes}min buckets` : '';
 
   const lastCure = fmtMinutes(kpis?.lastCureMinutes);
   const avgCure = fmtMinutes(kpis?.avgCureMinutes);
@@ -273,7 +274,7 @@ function renderKpis(kpis) {
     <div class="card">
       <h3>System Status</h3>
       <div class="muted">${sysText}</div>
-      <div class="muted" style="margin-top:6px;">Based on recent completions</div>
+      ${bucketText ? `<div class="muted" style="margin-top:2px;">${bucketText}</div>` : ''}
     </div>
 
     <div class="card">
@@ -1061,7 +1062,7 @@ function drawCureTimeSeries(cure, selSize = "ALL") {
     maxY = Math.max(maxY, n);
     minY = Math.min(minY, n);
   }
-  maxY = Math.ceil(maxY * 1.10);
+  maxY = Math.min(Math.ceil(maxY * 1.10), 200);  // Cap at 200 minutes
   minY = Math.floor(Math.max(0, minY - 5));
 
   function yFor(val) {
@@ -1596,12 +1597,12 @@ async function refresh() {
     showError("");
     const data = await fetchData();
     lastOvenData = data;
-    renderKpis(data.kpis);
+    renderKpis(data.kpis, data.bucketMinutes);
     setChartMode(chartViewEl?.value || "timeseries");
     renderCurrentView();
   } catch (e) {
     showError(e.message);
-    renderKpis(null);
+    renderKpis(null, null);
     if (lastOvenData) {
       setChartMode(chartViewEl?.value || "timeseries");
       renderCurrentView();
@@ -1663,7 +1664,7 @@ function rerenderForThemeChange() {
   if (!lastOvenData) return;
   setChartMode(chartViewEl?.value || "timeseries");
   renderCurrentView();
-  renderKpis(lastOvenData.kpis);
+  renderKpis(lastOvenData.kpis, lastOvenData.bucketMinutes);
 }
 
 // Rolling last hour helpers

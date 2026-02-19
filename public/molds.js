@@ -5,6 +5,17 @@
 const ACTIVE_WINDOW_MIN = 180;   // fallback when system is idle/off
 const RUNNING_WINDOW_MIN = 30;   // "system running" heuristic
 
+// TV mode support
+const q = new URLSearchParams(location.search);
+if (q.get("tv") === "1") document.documentElement.classList.add("tv-mode");
+
+// Custom title support for TV mode
+const titleOverride = q.get("title");
+if (titleOverride) {
+  const titleEl = document.getElementById("moldsTitle");
+  if (titleEl) titleEl.textContent = titleOverride;
+}
+
 const thresholdEl = document.getElementById("threshold");
 const saveThresholdBtn = document.getElementById("saveThreshold");
 const sizeFilterEl = document.getElementById("sizeFilter");

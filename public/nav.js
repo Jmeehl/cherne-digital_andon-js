@@ -99,7 +99,7 @@
       const lang = getSavedLang();
       await ensureI18nLoaded(lang);
 
-      const appTitle = (t("app_title") === "app_title") ? "Cherne Assist" : t("app_title");
+      const appTitle = (t("app_title") === "app_title") ? "CHERNE Assist" : t("app_title");
 
       mount.innerHTML = `
         <div class="topnav">
@@ -130,7 +130,7 @@
           await I18N.load(next);
           if (titleEl) titleEl.textContent = I18N.t("app_title");
         } else {
-          if (titleEl) titleEl.textContent = "Cherne Assist";
+          if (titleEl) titleEl.textContent = "CHERNE Assist";
         }
 
         window.dispatchEvent(new CustomEvent("cherneassist:langChanged", { detail: { lang: next } }));
@@ -199,7 +199,7 @@
             src="/assets/logo.svg"
             data-default="/assets/logo.svg"
             data-hover="/assets/logo-hover.svg"
-            alt="Cherne Assist"
+            alt="CHERNE Assist"
           />
           <span class="nav-title">CHERNE Assist</span>
           ${contextLinkHtml}

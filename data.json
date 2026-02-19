@@ -791,6 +791,48 @@
             "completedBy": "Hollis Fritts",
             "result": "Resolved",
             "solutionNote": "Test"
+          },
+          {
+            "ticketId": "mnt_1771446074313_2b9395f0",
+            "status": "COMPLETED",
+            "createdAt": 1771446074313,
+            "priority": "Medium",
+            "issue": "This is a test",
+            "assetLabel": "",
+            "progressStatus": "",
+            "fiix": {
+              "workOrderId": 157029832,
+              "workOrderNumber": "98272",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "This is a test",
+              "requestPriority": "Medium",
+              "requestAsset": ""
+            },
+            "completedAt": 1771446503916,
+            "completedBy": "Hollis Fritts",
+            "result": "Resolved",
+            "solutionNote": "tresy"
+          },
+          {
+            "ticketId": "mnt_1771457706071_60dc8103",
+            "status": "COMPLETED",
+            "createdAt": 1771457706071,
+            "priority": "Medium",
+            "issue": "Testing chime behavior",
+            "assetLabel": "PUMA TT1800SY MILLTURN",
+            "progressStatus": "Waiting for parts",
+            "fiix": {
+              "workOrderId": 157038584,
+              "workOrderNumber": "98276",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "Testing chime behavior",
+              "requestPriority": "Medium",
+              "requestAsset": "PUMA TT1800SY MILLTURN"
+            },
+            "completedAt": 1771458118945,
+            "completedBy": "Hollis Fritts",
+            "result": "Resolved",
+            "solutionNote": "Test Completed"
           }
         ]
       },
@@ -951,6 +993,61 @@
             "completedBy": "Hollis Fritts",
             "result": "Resolved",
             "solutionNote": "Fixed lock station laser"
+          },
+          {
+            "ticketId": "mnt_1771416754985_c4e5d256",
+            "status": "CANCELLED",
+            "createdAt": 1771416754985,
+            "priority": "Medium",
+            "issue": "No work",
+            "assetLabel": "",
+            "progressStatus": "",
+            "fiix": {
+              "workOrderId": 157002971,
+              "workOrderNumber": "98260",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "No work",
+              "requestPriority": "Medium",
+              "requestAsset": "",
+              "cancelError": "FIIX_WO_STATUS_ID_CANCELLED is not set."
+            },
+            "cancelledAt": 1771416950009
+          },
+          {
+            "ticketId": "mnt_1771447432332_adfc9ed5",
+            "status": "CANCELLED",
+            "createdAt": 1771447432332,
+            "priority": "Medium",
+            "issue": "this is a test",
+            "assetLabel": "",
+            "progressStatus": "",
+            "fiix": {
+              "workOrderId": 157030576,
+              "workOrderNumber": "98273",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "this is a test",
+              "requestPriority": "Medium",
+              "requestAsset": "",
+              "cancelError": "FIIX_WO_STATUS_ID_CANCELLED is not set."
+            },
+            "cancelledAt": 1771447449847
+          },
+          {
+            "ticketId": "mnt_1771522797838_8c20a004",
+            "status": "OPEN",
+            "createdAt": 1771522797838,
+            "priority": "Medium",
+            "issue": "6-8TB mold #2 needs to be inspected and parting line repaired.",
+            "assetLabel": "PLACEHOLDER - Asset B (Baking)",
+            "progressStatus": "In progress",
+            "fiix": {
+              "workOrderId": 157098480,
+              "workOrderNumber": "98299",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "6-8TB mold #2 needs to be inspected and parting line repaired.",
+              "requestPriority": "Medium",
+              "requestAsset": "PLACEHOLDER - Asset B (Baking)"
+            }
           }
         ]
       }
