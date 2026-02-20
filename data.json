@@ -148,10 +148,10 @@
         "callId": null
       },
       "small-ball-assembly": {
-        "status": "READY",
-        "requestedAt": null,
+        "status": "WAITING",
+        "requestedAt": 1771559976891,
         "fiix": null,
-        "callId": null
+        "callId": "call_mfg-eng_1771559976891_71b3b5bc"
       },
       "large-ball-assembly": {
         "status": "READY",
@@ -897,7 +897,29 @@
         "status": "READY",
         "requestedAt": null,
         "fiix": null,
-        "tickets": []
+        "tickets": [
+          {
+            "ticketId": "mnt_1771560060587_d1025406",
+            "status": "COMPLETED",
+            "createdAt": 1771560060587,
+            "priority": "High",
+            "issue": "Just wanted to participate.",
+            "assetLabel": "PLACEHOLDER - Asset A (Small Ball Assembly)",
+            "progressStatus": "",
+            "fiix": {
+              "workOrderId": 157476147,
+              "workOrderNumber": "98306",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "Just wanted to participate.",
+              "requestPriority": "High",
+              "requestAsset": "PLACEHOLDER - Asset A (Small Ball Assembly)"
+            },
+            "completedAt": 1771560254782,
+            "completedBy": "Daniel Wellens",
+            "result": "Resolved",
+            "solutionNote": "Got bored."
+          }
+        ]
       },
       "large-ball-assembly": {
         "status": "READY",
@@ -921,7 +943,29 @@
         "status": "READY",
         "requestedAt": null,
         "fiix": null,
-        "tickets": []
+        "tickets": [
+          {
+            "ticketId": "mnt_1771553038593_0c448f9a",
+            "status": "COMPLETED",
+            "createdAt": 1771553038593,
+            "priority": "Medium",
+            "issue": "Teams Message Test",
+            "assetLabel": "",
+            "progressStatus": "",
+            "fiix": {
+              "workOrderId": 157472873,
+              "workOrderNumber": "98305",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "Teams Message Test",
+              "requestPriority": "Medium",
+              "requestAsset": ""
+            },
+            "completedAt": 1771559510851,
+            "completedBy": "Daniel Wellens",
+            "result": "Resolved",
+            "solutionNote": "Test message received and actioned."
+          }
+        ]
       },
       "taniq-robot-1": {
         "status": "READY",
@@ -939,13 +983,51 @@
         "status": "READY",
         "requestedAt": null,
         "fiix": null,
-        "tickets": []
+        "tickets": [
+          {
+            "ticketId": "mnt_1771586375969_60e52b80",
+            "status": "CANCELLED",
+            "createdAt": 1771586375969,
+            "priority": "Medium",
+            "issue": "Test teams notification",
+            "assetLabel": "",
+            "progressStatus": "",
+            "fiix": {
+              "workOrderId": 157508530,
+              "workOrderNumber": "98322",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "Test teams notification",
+              "requestPriority": "Medium",
+              "requestAsset": "",
+              "cancelError": "FIIX_WO_STATUS_ID_CANCELLED is not set."
+            },
+            "cancelledAt": 1771586487603
+          }
+        ]
       },
       "waterjet-rubber": {
         "status": "READY",
         "requestedAt": null,
         "fiix": null,
-        "tickets": []
+        "tickets": [
+          {
+            "ticketId": "mnt_1771586582124_6f9ae9bb",
+            "status": "OPEN",
+            "createdAt": 1771586582124,
+            "priority": "Medium",
+            "issue": "Teams test",
+            "assetLabel": "WARDJET RUBBER WATERJET",
+            "progressStatus": "",
+            "fiix": {
+              "workOrderId": 157508611,
+              "workOrderNumber": "98323",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "Teams test",
+              "requestPriority": "Medium",
+              "requestAsset": "WARDJET RUBBER WATERJET"
+            }
+          }
+        ]
       },
       "baking": {
         "status": "READY",
@@ -1078,8 +1160,5 @@
       }
     }
   },
-  "webhooks": {
-    "mfg-eng": "https://default1c3fed3474a2403ca25a79f1144713.79.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/e9122c51c0dd43b88f23a38daf4766f9/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=iVRZyPbEOS_biztuF2MxT11Kb67OWCafgolTxzhRmTE",
-    "maintenance": null
-  }
+  "webhooks": {}
 }

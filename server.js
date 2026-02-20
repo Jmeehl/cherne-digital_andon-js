@@ -195,15 +195,28 @@ function notifyDeptWebhook(dept, body) {
         `<tr><td><strong>${k}</strong></td><td>${v}</td></tr>`
       ).join("");
 
-      const fiixLink = (data.fiix?.url && woNumber)
-        ? `<p><a href="${data.fiix.url}/${woNumber}">Open in Fiix →</a></p>`
+      const fiixLink = data.fiix?.url
+        ? `<p><a href="${data.fiix.url}">Open in Fiix →</a></p>`
+        : "";
+
+      const DASHBOARD_LINKS = {
+        "quality":     "http://10.12.1.75:3000/dashboard/quality",
+        "mfg-eng":     "http://10.12.1.75:3000/dashboard/mfg-eng",
+        "supervisor":  "http://10.12.1.75:3000/dashboard/supervisor",
+        "safety":      "http://10.12.1.75:3000/dashboard/safety",
+        "maintenance": "http://10.12.1.75:3000/dashboard/maintenance"
+      };
+      const dashboardUrl = DASHBOARD_LINKS[String(data.dept || dept).toLowerCase()];
+      const dashboardLink = dashboardUrl
+        ? `<p><a href="${dashboardUrl}">Open ${deptLabel} Dashboard →</a></p>`
         : "";
 
       const messageBody =
         `<p><strong>${deptLabel}</strong></p>` +
         `<p>${eventLabel}</p>` +
         (tableRows ? `<table>${tableRows}</table>` : "") +
-        fiixLink;
+        fiixLink +
+        dashboardLink;
 
       return { text, messageBody };
     };
