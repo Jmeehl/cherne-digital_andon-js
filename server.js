@@ -68,6 +68,7 @@ function makeId(prefix = "id") {
 }
 
 function ensureStateShape() {
+  if (!state.webhooks) state.webhooks = {};
   if (!state.active) state.active = {};
   for (const d of DEPARTMENTS) {
     if (!state.active[d.id]) state.active[d.id] = {};
@@ -121,7 +122,10 @@ saveState(state);
 // or at runtime via the debug endpoint which persists into `state.webhooks`.
 // ------------------------------------------------------------------
 let WEBHOOK_MAP = {
-  "mfg-eng": (state.webhooks && state.webhooks["mfg-eng"]) || process.env.WEBHOOK_MFG_ENG || process.env.TEAMS_WEBHOOK_MFG_ENG || null,
+  "quality":     (state.webhooks && state.webhooks["quality"])     || process.env.WEBHOOK_QUALITY     || null,
+  "mfg-eng":    (state.webhooks && state.webhooks["mfg-eng"])    || process.env.WEBHOOK_MFG_ENG    || process.env.TEAMS_WEBHOOK_MFG_ENG || null,
+  "supervisor":  (state.webhooks && state.webhooks["supervisor"])  || process.env.WEBHOOK_SUPERVISOR  || null,
+  "safety":      (state.webhooks && state.webhooks["safety"])      || process.env.WEBHOOK_SAFETY      || null,
   "maintenance": (state.webhooks && state.webhooks["maintenance"]) || process.env.WEBHOOK_MAINTENANCE || null
 };
 
@@ -129,82 +133,104 @@ function notifyDeptWebhook(dept, body) {
   try {
     const url = WEBHOOK_MAP[dept];
     if (!url) return Promise.resolve({ ok: false, error: "no_webhook_configured" });
-    // Build an Adaptive Card payload for Microsoft Teams (attachments)
-    const buildCard = (evt, data) => {
-      const status = String(data.status ?? evt ?? "open").toLowerCase();
-      const statusColor = status === "cancel" || status === "cancelled" ? "attention"
-        : status === "complete" || status === "completed" ? "good"
-        : "warning";
 
-      const title = data.title || (data.event || "Event");
-      const facts = [];
-      if (data.cellName) facts.push({ title: "Cell", value: String(data.cellName) });
-      if (data.cellId) facts.push({ title: "Cell ID", value: String(data.cellId) });
-      if (data.ticketId) facts.push({ title: "Ticket", value: String(data.ticketId) });
-      if (data.callId) facts.push({ title: "Call", value: String(data.callId) });
-      if (data.note) facts.push({ title: "Note", value: String(data.note) });
-      if (data.fiix?.workOrderNumber) facts.push({ title: "WO", value: String(data.fiix.workOrderNumber) });
-      if (data.ts) facts.push({ title: "Time", value: new Date(Number(data.ts)).toLocaleString() });
+    // Build a plain-text + HTML message for Power Automate "Post a message" action.
+    // `text` = plain summary; `messageBody` = HTML-formatted Teams message.
+    const buildMessage = (data) => {
+      const eventLabel = {
+        "ticket.request":  "🔧 Maintenance Request",
+        "ticket.cancel":   "❌ Maintenance Cancelled",
+        "ticket.complete": "✅ Maintenance Completed",
+        "call.request":    "📢 Call Request",
+        "call.cancel":     "❌ Call Cancelled",
+        "call.complete":   "✅ Call Completed",
+        "test":            "🔔 Webhook Test"
+      }[data.event] || `📋 ${String(data.event || "Notification")}`;
 
-      const card = {
-        "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
-        "type": "AdaptiveCard",
-        "version": "1.4",
-        "body": [
-          { "type": "TextBlock", "text": `${(data.dept || "").toUpperCase()} — ${title}`, "weight": "Bolder", "size": "Medium" },
-          { "type": "ColumnSet", "columns": [
-            { "type": "Column", "width": "stretch", "items": [ { "type": "FactSet", "facts": facts } ] },
-            { "type": "Column", "width": "auto", "items": [ { "type": "TextBlock", "text": String((data.status ?? "OPEN")).toUpperCase(), "weight": "Bolder", "color": statusColor } ] }
-          ] }
-        ]
+      // Use proper dept name if available, fall back to formatted id
+      const DEPT_NAMES = {
+        "quality":     "Quality",
+        "mfg-eng":     "Manufacturing Engineering",
+        "supervisor":  "Supervisor / Leads",
+        "safety":      "Safety",
+        "maintenance": "Maintenance"
       };
+      const deptLabel = DEPT_NAMES[String(data.dept || dept).toLowerCase()]
+        || String(data.dept || dept).replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 
-      // Add optional actions (link to Fiix)
-      if (data.fiix && data.fiix.url) {
-        const wo = data.fiix.workOrderNumber ? String(data.fiix.workOrderNumber) : null;
-        const href = data.fiix.url + (wo ? `/${wo}` : "");
-        card.actions = [ { "type": "Action.OpenUrl", "title": "Open Fiix", "url": href } ];
-      }
+      const cell = data.cellName || data.cellId || "";
+      const time = data.ts
+        ? new Date(Number(data.ts)).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true })
+        : new Date().toLocaleString();
 
-      return card;
+      // Only show status if it's meaningful (not test/open/ready noise)
+      const hiddenStatuses = new Set(["test", "open", "ready", ""]);
+      const status = hiddenStatuses.has(String(data.status || "").toLowerCase()) ? "" : String(data.status).toUpperCase();
+
+      // Only show fiix WO number, not raw internal call/ticket IDs
+      const woNumber = data.fiix?.workOrderNumber ? String(data.fiix.workOrderNumber) : "";
+
+      // Plain text summary
+      const text = [
+        `${deptLabel} — ${eventLabel}`,
+        cell ? `Cell: ${cell}` : "",
+        data.note ? `Note: ${data.note}` : "",
+        status ? `Status: ${status}` : "",
+        woNumber ? `WO#: ${woNumber}` : "",
+        `Time: ${time}`
+      ].filter(Boolean).join("  |  ");
+
+      // HTML table rows — only non-empty, meaningful fields
+      const rows = [
+        cell ? ["Cell", cell] : null,
+        data.note ? ["Note", data.note] : null,
+        data.responderName ? ["Responder", data.responderName] : null,
+        data.result ? ["Result", data.result] : null,
+        woNumber ? ["Work Order", woNumber] : null,
+        status ? ["Status", status] : null,
+        ["Time", time]
+      ].filter(Boolean);
+
+      const tableRows = rows.map(([k, v]) =>
+        `<tr><td><strong>${k}</strong></td><td>${v}</td></tr>`
+      ).join("");
+
+      const fiixLink = (data.fiix?.url && woNumber)
+        ? `<p><a href="${data.fiix.url}/${woNumber}">Open in Fiix →</a></p>`
+        : "";
+
+      const messageBody =
+        `<p><strong>${deptLabel}</strong></p>` +
+        `<p>${eventLabel}</p>` +
+        (tableRows ? `<table>${tableRows}</table>` : "") +
+        fiixLink;
+
+      return { text, messageBody };
     };
 
-    // POST with Adaptive Card attachment and return promise with result
     return (async () => {
       try {
-        const card = buildCard(body.event ?? body.type, body);
-        // Some Power Automate webhook endpoints expect the adaptive card JSON
-        // as a string field (e.g. 'adaptiveCard' or 'card'). Detect Power
-        // Automate endpoints and send the card as a string property to improve
-        // compatibility. Otherwise send a Teams-style attachment payload.
-        const isPowerAutomate = typeof url === 'string' && url.toLowerCase().includes('powerautomate');
-        let payload;
-        if (isPowerAutomate || process.env.FORCE_POWERAUTOMATE_MODE === '1') {
-          // Send minimal text payload for Power Automate to simplify flow handling
-          payload = {
-            text: String((body && (body.note || body.event)) ? (body.note || body.event) : ((body && body.dept) ? `${String(body.dept).toUpperCase()} notification` : 'Andon notification'))
-          };
-        } else {
-          payload = {
-            type: "message",
-            attachments: [ {
-              contentType: "application/vnd.microsoft.card.adaptive",
-              content: card
-            } ]
-          };
-        }
+        const { text, messageBody } = buildMessage(body);
+        const payload = { text, messageBody };
+
+        // The trigger schema requires attachments items to have `contentType` and `content`.
+        // Sending lowercase `attachments` without uppercase `Attachments` makes:
+        //   - Body['Attachments'] null check → TRUE → plain message branch
+        //   - foreach has 1 item with required fields → trigger schema satisfied
+        //   - PostMessageToConversation uses variables('Body')?['messageBody'] (our HTML)
+        payload.attachments = [{ contentType: "text/html", content: messageBody }];
 
         const resp = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-        const text = await resp.text().catch(() => "");
+        const respText = await resp.text().catch(() => "");
         if (!resp.ok) {
-          console.error(`Webhook POST to ${dept} failed: ${resp.status}`);
-          return { ok: false, status: resp.status, text };
+          console.error(`Webhook POST to ${dept} failed: ${resp.status} ${respText}`);
+          return { ok: false, status: resp.status, text: respText };
         }
-        return { ok: true, status: resp.status, text };
+        return { ok: true, status: resp.status, text: respText };
       } catch (e) {
         console.error(`Webhook POST to ${dept} error:`, e?.message ?? e);
         return { ok: false, error: e?.message ?? String(e) };
@@ -915,6 +941,8 @@ function cancelSingleCall(dept, cellId, callId = null) {
   if (slot.status !== "WAITING") return false;
   if (callId && slot.callId && callId !== slot.callId) return false;
 
+  const cellName = CELLS.find((c) => c.id === cellId)?.name;
+
   // log BEFORE clearing
   appendLog({
     type: "call_cancel",
@@ -930,6 +958,7 @@ function cancelSingleCall(dept, cellId, callId = null) {
     ts: Date.now(),
     dept,
     cellId,
+    cellName,
     callId: slot.callId,
     status: "cancelled"
   });
@@ -1927,6 +1956,8 @@ app.post("/api/cancel", async (req, res) => {
   if (!dept || !isValidDept(dept)) return res.status(400).json({ ok: false, error: "Invalid dept" });
   if (!cellId || !isValidCell(cellId)) return res.status(400).json({ ok: false, error: "Invalid cellId" });
 
+  const cellName = CELLS.find((c) => c.id === cellId)?.name;
+
   if (dept === "maintenance") {
     const t = ticketId ? findMaintTicket(cellId, ticketId) : findLatestOpenMaintTicket(cellId);
     if (!t || t.status !== "OPEN") return res.status(400).json({ ok: false, error: "No open maintenance ticket found" });
@@ -2004,6 +2035,7 @@ app.post("/api/complete", async (req, res) => {
   if (!dept || !isValidDept(dept)) return res.status(400).json({ ok: false, error: "Invalid dept" });
   if (!cellId || !isValidCell(cellId)) return res.status(400).json({ ok: false, error: "Invalid cellId" });
 
+  const cellName = CELLS.find((c) => c.id === cellId)?.name;
   const responder = (responderName ?? "").trim();
   const pn = (partNumber ?? "").trim();
   const resu = (result ?? "").trim();

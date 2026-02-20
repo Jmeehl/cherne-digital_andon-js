@@ -833,6 +833,27 @@
             "completedBy": "Hollis Fritts",
             "result": "Resolved",
             "solutionNote": "Test Completed"
+          },
+          {
+            "ticketId": "mnt_1771526184059_ea4b5cc2",
+            "status": "COMPLETED",
+            "createdAt": 1771526184059,
+            "priority": "Medium",
+            "issue": "I broke it",
+            "assetLabel": "PUMA TT1800SY MILLTURN",
+            "progressStatus": "Troubleshooting",
+            "fiix": {
+              "workOrderId": 157101382,
+              "workOrderNumber": "98301",
+              "url": "https://oateyscs.macmms.com",
+              "requestDescription": "I broke it",
+              "requestPriority": "Medium",
+              "requestAsset": "PUMA TT1800SY MILLTURN"
+            },
+            "completedAt": 1771529485493,
+            "completedBy": "Jesse Meehl",
+            "result": "Resolved",
+            "solutionNote": "Test"
           }
         ]
       },
@@ -1034,7 +1055,7 @@
           },
           {
             "ticketId": "mnt_1771522797838_8c20a004",
-            "status": "OPEN",
+            "status": "COMPLETED",
             "createdAt": 1771522797838,
             "priority": "Medium",
             "issue": "6-8TB mold #2 needs to be inspected and parting line repaired.",
@@ -1047,10 +1068,18 @@
               "requestDescription": "6-8TB mold #2 needs to be inspected and parting line repaired.",
               "requestPriority": "Medium",
               "requestAsset": "PLACEHOLDER - Asset B (Baking)"
-            }
+            },
+            "completedAt": 1771525388412,
+            "completedBy": "Hollis Fritts",
+            "result": "Resolved",
+            "solutionNote": "Found sharp edges/wear at the mating surface of the mold.  Repaired and polished surface smooth.  Verified all vent holes cleaned and all rods in good order."
           }
         ]
       }
     }
+  },
+  "webhooks": {
+    "mfg-eng": "https://default1c3fed3474a2403ca25a79f1144713.79.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/e9122c51c0dd43b88f23a38daf4766f9/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=iVRZyPbEOS_biztuF2MxT11Kb67OWCafgolTxzhRmTE",
+    "maintenance": null
   }
 }
