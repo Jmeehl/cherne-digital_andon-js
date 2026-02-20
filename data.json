@@ -148,10 +148,10 @@
         "callId": null
       },
       "small-ball-assembly": {
-        "status": "WAITING",
-        "requestedAt": 1771559976891,
+        "status": "READY",
+        "requestedAt": null,
         "fiix": null,
-        "callId": "call_mfg-eng_1771559976891_71b3b5bc"
+        "callId": null
       },
       "large-ball-assembly": {
         "status": "READY",
@@ -1012,12 +1012,12 @@
         "tickets": [
           {
             "ticketId": "mnt_1771586582124_6f9ae9bb",
-            "status": "OPEN",
+            "status": "COMPLETED",
             "createdAt": 1771586582124,
             "priority": "Medium",
             "issue": "Teams test",
             "assetLabel": "WARDJET RUBBER WATERJET",
-            "progressStatus": "",
+            "progressStatus": "In progress",
             "fiix": {
               "workOrderId": 157508611,
               "workOrderNumber": "98323",
@@ -1025,7 +1025,11 @@
               "requestDescription": "Teams test",
               "requestPriority": "Medium",
               "requestAsset": "WARDJET RUBBER WATERJET"
-            }
+            },
+            "completedAt": 1771587330886,
+            "completedBy": "Daniel Wellens",
+            "result": "Resolved",
+            "solutionNote": "Fixed the issue"
           }
         ]
       },
