@@ -6,71 +6,135 @@
     { "code": "CHE-Lathe-005 (60000004)", "name": "HAAS TL3 LATHE" },
     { "code": "CHE-MILL-4 (60000071)", "name": "MILLTAP 700" },
     { "code": "CHE-WJET-4", "name": "WARDJET DUAL HEAD WATERJET" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Clean Seal)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Clean Seal)" },
     { "code": "CHE-WJET-2 (60000036)", "name": "FLOW WATERJET" },
     { "code": "CHE-Lathe-006 (60000070)", "name": "FRYER SL8 LATHE" }
   ],
   "clean-seal": [
-    { "code": 11111, "name": "PLACEHOLDER - Asset A (Clean Seal)" },
-    { "code": 11112, "name": "PLACEHOLDER - Asset B (Clean Seal)" }
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Clean Seal)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Clean Seal)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Clean Seal)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Clean Seal)" }
   ],
   "extension-hose": [
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Extension Hose)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Extension Hose)" },
     { "code": 0, "name": "PLACEHOLDER - Asset A (Extension Hose)" },
     { "code": 0, "name": "PLACEHOLDER - Asset B (Extension Hose)" }
   ],
   "end-element": [
     { "code": 0, "name": "PLACEHOLDER - Asset A (End Element)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (End Element)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (End Element)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (End Element)" },
     { "code": 0, "name": "PLACEHOLDER - Asset B (End Element)" }
   ],
   "robot-finishing": [
+    { "code":"CHE-LASER-001 (60000602)", "name": "Laser Etcher" },
+    { "code": "CHE-CRDSTRIP-001", "name": "Cardboard Stripper" },
     { "code": 0, "name": "PLACEHOLDER - Asset A (Robot Finishing)" },
-    { "code": 0, "name": "PLACEHOLDER - Asset B (Robot Finishing)" }
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Robot Finishing)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Robot Finishing)" },
+    { "code": "CHE-DUNKTANK-002", "name": "Dunk Tank #2" }
   ],
   "large-ball-testing": [
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Large Ball Testing)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Large Ball Testing)" },
     { "code": 0, "name": "PLACEHOLDER - Asset A (Large Ball Testing)" },
     { "code": 0, "name": "PLACEHOLDER - Asset B (Large Ball Testing)" }
   ],
   "small-ball-testing": [
     { "code": 0, "name": "PLACEHOLDER - Asset A (Small Ball Testing)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Small Ball Testing)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Small Ball Testing)" },
     { "code": 0, "name": "PLACEHOLDER - Asset B (Small Ball Testing)" }
   ],
   "small-ball-assembly": [
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Small Ball Assembly)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Small Ball Assembly)" },
     { "code": 0, "name": "PLACEHOLDER - Asset A (Small Ball Assembly)" },
     { "code": 0, "name": "PLACEHOLDER - Asset B (Small Ball Assembly)" }
   ],
   "large-ball-assembly": [
     { "code": 0, "name": "PLACEHOLDER - Asset A (Large Ball Assembly)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Large Ball Assembly)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Large Ball Assembly)" },
     { "code": 0, "name": "PLACEHOLDER - Asset B (Large Ball Assembly)" }
   ],
   "discrete": [
+    { "code": "CHE-HEPR-004 (60000627)", "name": "End Element Heat Press" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Discrete)" },
     { "code": 0, "name": "PLACEHOLDER - Asset A (Discrete)" },
     { "code": 0, "name": "PLACEHOLDER - Asset B (Discrete)" }
   ],
   "tubes-inserts": [
     { "code": 0, "name": "PLACEHOLDER - Asset A (Tubes & Inserts)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Tubes & Inserts)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Tubes & Inserts)" },
     { "code": 0, "name": "PLACEHOLDER - Asset B (Tubes & Inserts)" }
   ],
   "poly-lift-line": [
-    { "code": 0, "name": "PLACEHOLDER - Asset A (Poly Lift Line)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Tubes & Inserts)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Tubes & Inserts)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Tubes & Inserts)" },
     { "code": 0, "name": "PLACEHOLDER - Asset B (Poly Lift Line)" }
   ],
   "taniq-robot-1": [
     { "code": "CHE-HEAT-TAPE-REMOVER-001", "name": "ROBOT #1 TAPE REMOVER" },
-    { "code": 0, "name": "PLACEHOLDER - Asset B (Taniq Robot #1)" }
+    { "code": 0, "name": "PLACEHOLDER - Asset A (taniq-robot)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (taniq-robot)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (taniq-robot)" },
+    { "code": "CHE-MANDREL-END-PULLER-001", "name": "Mendrel End Puller" },
+    { "code": "CHE-ROBOT-001 (60000156)", "name": "Taniq Robot #1" }
   ],
   "taniq-robot-2": [
-    { "code": 0, "name": "PLACEHOLDER - Asset A (Taniq Robot #2)" },
+    { "code": "CHE-ROBOT-002", "name": "Taniq Robot #2" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Taniq Robot #2)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Taniq Robot #2)" },
     { "code": 0, "name": "PLACEHOLDER - Asset B (Taniq Robot #2)" }
   ],
   "autoclave": [
     { "code": "CHE-HEPR-002 (60000158)", "name": "LABEL HEAT PRESS" },
     { "code": "CHE-HTS-001", "name": "HEAT TAPE REMOVER (OLD))" },
+    { "code": "CHE-PIT-008 (60000157)", "name": "Cart Caddy" },
+    { "code": "CHE-LIFT-008", "name": "Blue and Yellow Powered Lift Cart" },
+    { "code": "CHE-MAN-006", "name": "54-96 Sleeve Mandrel" },
+    { "code": "CHE-HEPR-001 (60000152)", "name": "Bulkhead Press" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Autoclave)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Autoclave)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset A (Autoclave)" },
     { "code": "CHE-HTS-002", "name": "HEAT TAPE REMOVER (NEW))" }
   ],
   "waterjet-rubber": [
-    { "code": "CHE-WJET-3", "name": "WARDJET RUBBER WATERJET" }
+    { "code": "CHE-WJET-3", "name": "WARDJET RUBBER WATERJET" },
+    { "code": "CHE-VESTIL-001 (60000618)", "name": "Powered Lift Stacker " },
+    { "code": "CHE-RSPUNCH-01", "name": "Pneumatic Slug Puncher" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (waterjet-Rubber)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (waterjet-Rubber)" }
   ],
   "baking": [
     { "code": "CHE-OVEN-007", "name": "BIG OVEN" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Baking)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Baking)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Baking)" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Baking)" },
     { "code": 0, "name": "PLACEHOLDER - Asset B (Baking)" }
+  ],
+  "receiving": [
+    { "code": "CHE-DOCK-DOOR-1", "name": "Dock Door #1" },
+    { "code": "CHE-DOCK-DOOR-2", "name": "Dock Door #2" },
+    { "code": "CHE-DOCK-DOOR-3", "name": "Dock Door #3" },
+    { "code": "CHE-DOCK-DOOR-4", "name": "Dock Door #4" },
+    { "code": "CHE-DOCK-DOOR-5", "name": "Dock Door #5" },
+    { "code": "CHE-DOCK-DOOR-6", "name": "Dock Door #6" },
+    { "code": "CHE-DOCK-DOOR-7", "name": "Dock Door #7" },
+    { "code": "CHE-DOCK-DOOR-8", "name": "Dock Door #8" },
+    { "code": "CHE-DOCK-DOOR-9", "name": "Dock Door #9" },
+    { "code": "CHE-BATT-CHARG-001 (60000128)", "name": "Battery Charger #1" },
+    { "code": "CHE-BATT-CHARG-002 (60000607)", "name": "Battery Charger #2" },
+    { "code": "CHE-STRETCH-WRAPPER-001 (60000026)", "name": "Pallet Wraper #1"},
+    { "code": "CHE-PIT-006 (60000118)", "name": "Tugger" },
+    { "code": 0, "name": "PLACEHOLDER - Asset B (Receiving)" }
   ]
 }
